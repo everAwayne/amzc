@@ -8,7 +8,7 @@ from util.log import logger
 from .spiders.dispatch import get_spider_by_platform, get_url_by_platfrom
 
 
-MAX_WORKERS = 5
+MAX_WORKERS = 10
 
 # Two events to sync handle workers and change_ip worker
 # handle worker wait for finish_change_event and set start_change_event
@@ -19,6 +19,8 @@ start_change_event.clear()
 finish_change_event.clear()
 event_wait = 0
 in_request = 0
+task_cnt = 0
+change_ip_cnt = 0
 
 async def handle_worker(server, task):
     """Handle amz_product task
@@ -51,8 +53,10 @@ async def handle_worker(server, task):
     """
     global event_wait
     global in_request
+    global task_cnt
     task_dct = json.loads(task.get_data().decode('utf-8'))
 
+    logger.info("No.%d" % task_cnt)
     try:
         in_request += 1
         # if ther is any handle worker is waiting for changing ip,
@@ -132,24 +136,28 @@ async def change_ip(server):
     """
     global event_wait
     global in_request
+    global change_ip_cnt
     while True:
+        change_ip_cnt += 1
         await start_change_event.wait()
         assert event_wait, "event_wait should more than 0"
         assert event_wait==in_request, "event_wait should be equal to running_cnt"
+        logger.info("[%d]change ip start" % change_ip_cnt)
         while True:
             ret = os.system('ifdown ppp0')
             if ret == 0:
                 break
             else:
-                logger.error('ppp0 stop error')
+                logger.error('[%d]ppp0 stop error' % change_ip_cnt)
                 asyncio.sleep(10)
         while True:
             ret = os.system('ifup ppp0')
             if ret == 0:
                 break
             else:
-                logger.error('ppp0 start error')
+                logger.error('[%d]ppp0 start error' % change_ip_cnt)
                 asyncio.sleep(10)
+        logger.info("[%d]change ip end" % change_ip_cnt)
         finish_change_event.set()
         finish_change_event.clear()
         event_wait = 0

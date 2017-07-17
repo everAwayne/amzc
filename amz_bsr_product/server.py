@@ -9,7 +9,7 @@ from util.log import logger
 from .spiders.dispatch import get_spider_by_platform
 
 
-MAX_WORKERS = 5
+MAX_WORKERS = 2
 
 # Two events to sync handle workers and change_ip worker
 # handle worker wait for finish_change_event and set start_change_event
@@ -75,6 +75,7 @@ async def handle_worker(server, task):
 
             handle_cls = get_spider_by_platform(task_dct['platform'])
             url = task_dct['root_url'] if 'root_url' in task_dct else task_dct['url']
+            print(url)
             headers = get_header()
             html = None
             try:
@@ -139,8 +140,8 @@ async def handle_worker(server, task):
             taks_info = ' '.join(task_dct['platform'], url)
             logger.error('Get page info error\n'+taks_info, exc_info=exc_info)
             return
-        asin_ls = [asin for asin in asin_ls if asin not in asin_set]
-        asin_set.update(asin_ls)
+        asin_ls = [item for item in asin_ls if item['asin'] not in asin_set]
+        asin_set.update([item['asin'] for item in asin_ls])
 
         task_ls = []
         for url in url_ls:
@@ -178,8 +179,20 @@ async def change_ip(server):
         await start_change_event.wait()
         assert event_wait, "event_wait should more than 0"
         assert event_wait==in_request, "event_wait should be equal to running_cnt"
-        os.system('pppoe-stop')
-        os.system('pppoe-start')
+        while True:
+            ret = os.system('ifdown ppp0')
+            if ret == 0:
+                break
+            else:
+                logger.error('ppp0 stop error')
+                asyncio.sleep(10)
+        while True:
+            ret = os.system('ifup ppp0')
+            if ret == 0:
+                break
+            else:
+                logger.error('ppp0 start error')
+                asyncio.sleep(10)
         finish_change_event.set()
         finish_change_event.clear()
         event_wait = 0
@@ -200,5 +213,5 @@ def run():
     server.add_input_endpoint('inner_input', inner_input_end)
     server.add_output_endpoint('output', product_end, buffer_size=MAX_WORKERS*20)
     server.add_output_endpoint('input_back', back_end)
-    server.add_output_endpoint('inner_output', inner_input_end)
+    server.add_output_endpoint('inner_output', inner_output_end)
     server.run()
