@@ -9,9 +9,8 @@ from lxml import etree
 class AMZUKProductInfo:
     """Extract product info from page
     """
-    def __init__(self, html, asin):
+    def __init__(self, html):
         self.soup = etree.HTML(html, parser=etree.HTMLParser(encoding='utf-8'))
-        self.asin = asin
 
     def is_product_page(self):
         """Determinate page is a product page or not
@@ -40,7 +39,6 @@ class AMZUKProductInfo:
         bsr_info = self.get_bsr_info()
 
         return {
-            'asin': self.asin,
             'fba': 1 if is_fba else 0,
             'title': title_info['title'],
             'brand': brand_info['brand'],

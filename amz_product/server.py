@@ -1,26 +1,15 @@
-import os
 import json
-import asyncio
-import aiohttp
 import pipeflow
-from util.headers import get_header
+from error import RequestError
 from util.log import logger
+from util.chrequest import get_page_handle, change_ip
 from .spiders.dispatch import get_spider_by_platform, get_url_by_platfrom
 
 
 MAX_WORKERS = 10
 
-# Two events to sync handle workers and change_ip worker
-# handle worker wait for finish_change_event and set start_change_event
-# change_ip worker wait for start_change_event and set finish_change_event
-start_change_event = asyncio.Event()
-finish_change_event = asyncio.Event()
-start_change_event.clear()
-finish_change_event.clear()
-event_wait = 0
-in_request = 0
 task_cnt = 0
-change_ip_cnt = 0
+
 
 async def handle_worker(server, task):
     """Handle amz_product task
@@ -51,75 +40,39 @@ async def handle_worker(server, task):
                 'img': 'https://images-na.ssl-images-amazon.com/images/I/514RSPIJMKL.jpg'
             }
     """
-    global event_wait
-    global in_request
     global task_cnt
     task_dct = json.loads(task.get_data().decode('utf-8'))
 
+    task_cnt += 1
     logger.info("No.%d" % task_cnt)
+
+    handle_cls = get_spider_by_platform(task_dct['platform'])
+    url = get_url_by_platfrom(task_dct['platform'], task_dct['asin'])
     try:
-        in_request += 1
-        # if ther is any handle worker is waiting for changing ip,
-        # or have received a captcha page,
-        # then stop and wait for changing ip
-        # trigger to change ip when all running handle worker have no IO operation
-        if event_wait > 0:
-            if event_wait+1 == in_request:
-                start_change_event.set()
-                start_change_event.clear()
-            event_wait += 1
-            await finish_change_event.wait()
-
-        handle_cls = get_spider_by_platform(task_dct['platform'])
-        url = get_url_by_platfrom(task_dct['platform'], task_dct['asin'])
-        headers = get_header()
-        html = None
-        try:
-            async with aiohttp.ClientSession(headers=headers) as session:
-                async with session.get(url, timeout=90) as resp:
-                    html = await resp.read()
-        except Exception as exc:
-            exc_info = (type(exception), exception, exception.__traceback__)
-            logger.error('Request page fail', exc_info=exc_info)
-            task.set_to('loop')
-            return task
-        try:
-            handle = handle_cls(html, task_dct['asin'])
-        except Exception as exc:
-            exc_info = (type(exception), exception, exception.__traceback__)
-            taks_info = ' '.join(task_dct['platform'], task_dct['asin'])
-            logger.error('Parse page error\n'+taks_info, exc_info=exc_info)
-            return
-        is_product_page = handle.is_product_page()
-        is_captcha_page = handle.is_captcha_page()
-
-        if is_captcha_page:
-            if event_wait+1 == in_request:
-                start_change_event.set()
-                start_change_event.clear()
-            event_wait += 1
-            await finish_change_event.wait()
-    finally:
-        in_request -= 1
-        if event_wait > 0 and event_wait == in_request:
-            start_change_event.set()
-            start_change_event.clear()
-
-    # redo task
-    if is_captcha_page:
+        handle = await get_page_handle(handle_cls, url, timeout=90)
+    except RequestError:
         task.set_to('loop')
         return task
+    except Exception as exc:
+        exc_info = (type(exc), exc, exc.__traceback__)
+        taks_info = ' '.join(task_dct['platform'], task_dct['asin'])
+        logger.error('Get page handle error\n'+taks_info, exc_info=exc_info)
+        exc.__traceback__ = None
+        return
 
+    is_product_page = handle.is_product_page()
     # abandon result
     if not is_product_page:
         return
 
     try:
         info = handle.get_info()
+        info['asin'] = task_dct['asin']
     except Exception as exc:
-        exc_info = (type(exception), exception, exception.__traceback__)
+        exc_info = (type(exc), exc, exc.__traceback__)
         taks_info = ' '.join(task_dct['platform'], task_dct['asin'])
         logger.error('Get page info error\n'+taks_info, exc_info=exc_info)
+        exc.__traceback__ = None
         return
 
     result_task = pipeflow.Task(json.dumps(info).encode('utf-8'))
@@ -127,46 +80,10 @@ async def handle_worker(server, task):
     return result_task
 
 
-async def change_ip(server):
-    """Change machine IP(blocking)
-
-    Wait for start_change_event.
-    When all running handle workers are wait for finish_change_event,
-    start_change_event will be set.
-    """
-    global event_wait
-    global in_request
-    global change_ip_cnt
-    while True:
-        change_ip_cnt += 1
-        await start_change_event.wait()
-        assert event_wait, "event_wait should more than 0"
-        assert event_wait==in_request, "event_wait should be equal to running_cnt"
-        logger.info("[%d]change ip start" % change_ip_cnt)
-        while True:
-            ret = os.system('ifdown ppp0')
-            if ret == 0:
-                break
-            else:
-                logger.error('[%d]ppp0 stop error' % change_ip_cnt)
-                asyncio.sleep(10)
-        while True:
-            ret = os.system('ifup ppp0')
-            if ret == 0:
-                break
-            else:
-                logger.error('[%d]ppp0 start error' % change_ip_cnt)
-                asyncio.sleep(10)
-        logger.info("[%d]change ip end" % change_ip_cnt)
-        finish_change_event.set()
-        finish_change_event.clear()
-        event_wait = 0
-
-
 def run():
-    i_end = pipeflow.RedisInputEndpoint('i_end', host='192.168.0.10', port=6379, db=0, password=None)
-    o_end = pipeflow.RedisOutputEndpoint('o_end', host='192.168.0.10', port=6379, db=0, password=None)
-    l_end = pipeflow.RedisOutputEndpoint('i_end', host='192.168.0.10', port=6379, db=0, password=None)
+    i_end = pipeflow.RedisInputEndpoint('amz_product:input', host='192.168.0.10', port=6379, db=0, password=None)
+    o_end = pipeflow.RedisOutputEndpoint('amz_product:output', host='192.168.0.10', port=6379, db=0, password=None)
+    l_end = pipeflow.RedisOutputEndpoint('amz_product:input', host='192.168.0.10', port=6379, db=0, password=None)
 
     server = pipeflow.Server(MAX_WORKERS)
     server.set_handle(handle_worker)
