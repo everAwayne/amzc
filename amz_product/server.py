@@ -11,7 +11,7 @@ MAX_WORKERS = 10
 task_cnt = 0
 
 
-async def handle_worker(server, task):
+async def handle_worker(group, task):
     """Handle amz_product task
 
     input task data format:
@@ -85,10 +85,11 @@ def run():
     o_end = pipeflow.RedisOutputEndpoint('amz_product:output', host='192.168.0.10', port=6379, db=0, password=None)
     l_end = pipeflow.RedisOutputEndpoint('amz_product:input', host='192.168.0.10', port=6379, db=0, password=None)
 
-    server = pipeflow.Server(MAX_WORKERS)
-    server.set_handle(handle_worker)
+    server = pipeflow.Server()
     server.add_worker(change_ip)
-    server.add_input_endpoint('input', i_end)
-    server.add_output_endpoint('output', o_end)
-    server.add_output_endpoint('loop', l_end)
+    group = server.add_group('main', MAX_WORKERS)
+    group.set_handle(handle_worker)
+    group.add_input_endpoint('input', i_end)
+    group.add_output_endpoint('output', o_end)
+    group.add_output_endpoint('loop', l_end)
     server.run()
