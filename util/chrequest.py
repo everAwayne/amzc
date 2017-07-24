@@ -18,7 +18,7 @@ in_request = 0
 change_ip_cnt = 0
 
 
-async def get_page_handle(handle_cls, url, timeout=90):
+async def get_page_handle(handle_cls, url, timeout=60):
     """Get the page of url, and create a handle, then return it.
 
     If the page is a captcha page, change ip and request again.

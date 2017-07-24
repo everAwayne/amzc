@@ -46,7 +46,7 @@ async def handle_worker(group, task):
             return task
         except Exception as exc:
             exc_info = (type(exc), exc, exc.__traceback__)
-            taks_info = ' '.join(task_dct['platform'], url)
+            taks_info = ' '.join([task_dct['platform'], url])
             logger.error('Get page handle error\n'+taks_info, exc_info=exc_info)
             exc.__traceback__ = None
             return
@@ -68,7 +68,7 @@ async def handle_worker(group, task):
             url_ls, asin_ls = handle.get_info(filter_ls, is_exist)
         except Exception as exc:
             exc_info = (type(exc), exc, exc.__traceback__)
-            taks_info = ' '.join(task_dct['platform'], url)
+            taks_info = ' '.join([task_dct['platform'], url])
             logger.error('Get page info error\n'+taks_info, exc_info=exc_info)
             exc.__traceback__ = None
             return
