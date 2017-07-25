@@ -12,7 +12,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Start optional crawler')
     parser.add_argument('-d', '--daemon', dest='daemon', action='store_true',
                         help='run as daemon')
-    parser.add_argument('-c', '-crawler', dest='crawler', choices=CRAWLER_LS,
+    parser.add_argument('-c', '--crawler', dest='crawler', choices=CRAWLER_LS,
                         required=True, help='specify which crawler should be started')
     args = parser.parse_args()
 

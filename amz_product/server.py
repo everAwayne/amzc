@@ -46,7 +46,7 @@ async def handle_worker(group, task):
     task_dct = json.loads(task.get_data().decode('utf-8'))
 
     task_cnt += 1
-    logger.info("No.%d" % task_cnt)
+    logger.info("No.%d %s %s" % (task_cnt, task_dct['platform'], task_dct['asin']))
 
     handle_cls = get_spider_by_platform(task_dct['platform'])
     url = get_url_by_platfrom(task_dct['platform'], task_dct['asin'])
