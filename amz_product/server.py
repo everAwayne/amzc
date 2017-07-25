@@ -14,13 +14,14 @@ task_cnt = 0
 async def handle_worker(group, task):
     """Handle amz_product task
 
-    input task data format:
+    [input] task data format:
         JSON:
             {
                 "platfrom": "amazon_us",
-                "asin": "B02KDI8NID8"
+                "asin": "B02KDI8NID8",
+                "extra": {}         #optional
             }
-    output result data format:
+    [output] result data format:
         JSON:
             {
                 'asin': 'B02KDI8NID8',
@@ -41,6 +42,7 @@ async def handle_worker(group, task):
             }
     """
     global task_cnt
+    from_end = task.get_from()
     task_dct = json.loads(task.get_data().decode('utf-8'))
 
     task_cnt += 1
@@ -51,7 +53,8 @@ async def handle_worker(group, task):
     try:
         handle = await get_page_handle(handle_cls, url, timeout=90)
     except RequestError:
-        task.set_to('loop')
+        if from_end == 'input_bsr':
+            task.set_to('loop_bsr')
         return task
     except Exception as exc:
         exc_info = (type(exc), exc, exc.__traceback__)
@@ -68,6 +71,8 @@ async def handle_worker(group, task):
     try:
         info = handle.get_info()
         info['asin'] = task_dct['asin']
+        info['platfrom'] = task_dct['platform']
+        info.update(task_dct['extra'])
     except Exception as exc:
         exc_info = (type(exc), exc, exc.__traceback__)
         taks_info = ' '.join([task_dct['platform'], task_dct['asin']])
@@ -76,20 +81,21 @@ async def handle_worker(group, task):
         return
 
     result_task = pipeflow.Task(json.dumps(info).encode('utf-8'))
-    result_task.set_to('output')
+    if from_end == 'input_bsr':
+        result_task.set_to('output_bsr')
     return result_task
 
 
 def run():
-    i_end = pipeflow.RedisInputEndpoint('amz_product:input', host='192.168.0.10', port=6379, db=0, password=None)
-    o_end = pipeflow.RedisOutputEndpoint('amz_product:output', host='192.168.0.10', port=6379, db=0, password=None)
-    l_end = pipeflow.RedisOutputEndpoint('amz_product:input', host='192.168.0.10', port=6379, db=0, password=None)
+    i_bsr_end = pipeflow.RedisInputEndpoint('amz_product:input:bsr', host='192.168.0.10', port=6379, db=0, password=None)
+    o_bsr_end = pipeflow.RedisOutputEndpoint('amz_product:output:bsr', host='192.168.0.10', port=6379, db=0, password=None)
+    l_bsr_end = pipeflow.RedisOutputEndpoint('amz_product:input:bsr', host='192.168.0.10', port=6379, db=0, password=None)
 
     server = pipeflow.Server()
     server.add_worker(change_ip)
     group = server.add_group('main', MAX_WORKERS)
     group.set_handle(handle_worker)
-    group.add_input_endpoint('input', i_end)
-    group.add_output_endpoint('output', o_end)
-    group.add_output_endpoint('loop', l_end)
+    group.add_input_endpoint('input_bsr', i_bsr_end)
+    group.add_output_endpoint('output_bsr', o_bsr_end)
+    group.add_output_endpoint('loop_bsr', l_bsr_end)
     server.run()

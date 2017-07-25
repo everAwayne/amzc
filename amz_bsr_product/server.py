@@ -1,5 +1,6 @@
 import re
 import json
+import time
 import asyncio
 import pipeflow
 from error import RequestError
@@ -26,6 +27,16 @@ async def handle_worker(group, task):
             {
                 "platform": "amazon_us",
                 "url": "https://www.amazon.de/gp/bestsellers",
+            }
+    [output] result data format:
+        JSON:
+            {
+                "platform": "amazon_us"
+                "asin": "xxxx"
+                "extra": {
+                    "bs_cate": [item["cate"]],
+                    "date": "xxxx-xx-xx"
+                }
             }
     """
     global filter_ls
@@ -78,14 +89,15 @@ async def handle_worker(group, task):
         task_ls = []
         for url in url_ls:
             new_task = pipeflow.Task(json.dumps({'platform': task_dct['platform'],
-                                                 'url': url}).encode('utf-8'))
+                                                 'url': url, 'date': task_dct['date']}).encode('utf-8'))
             new_task.set_to('inner_output')
             task_ls.append(new_task)
         task_count += len(url_ls)
         for item in asin_ls:
             new_task = pipeflow.Task(json.dumps({'platform': task_dct['platform'],
                                                  'asin': item['asin'],
-                                                 'extra': item['cate']}).encode('utf-8'))
+                                                 'extra': {'bs_cate': [item['cate']],
+                                                           'date': task_dct['date']}}).encode('utf-8'))
             new_task.set_to('output')
             task_ls.append(new_task)
         return task_ls
@@ -127,6 +139,7 @@ async def handle_task(group, task):
             task_dct = json.loads(task.get_data().decode('utf-8'))
             filter_ls = [cate.lower() for cate in task_dct['category_filter']]
             task_dct['url'] = task_dct['root_url']
+            task_dct['date'] = time.strftime("%Y-%m-%d", time.localtime())
             del task_dct['root_url']
             del task_dct['category_filter']
             task.set_data(json.dumps(task_dct).encode('utf-8'))
@@ -142,12 +155,12 @@ async def handle_task(group, task):
 
 
 def run():
-    bsr_end = pipeflow.RedisInputEndpoint('bsr_end', host='192.168.0.10', port=6379, db=0, password=None)
-    back_end = pipeflow.RedisOutputEndpoint('bsr_end', host='192.168.0.10', port=6379, db=0, password=None)
+    bsr_end = pipeflow.RedisInputEndpoint('amz_bsr_product:input', host='192.168.0.10', port=6379, db=0, password=None)
+    back_end = pipeflow.RedisOutputEndpoint('amz_bsr_product:input', host='192.168.0.10', port=6379, db=0, password=None)
     queue = asyncio.Queue()
     notify_input_end = pipeflow.QueueInputEndpoint(queue)
     notify_output_end = pipeflow.QueueOutputEndpoint(queue)
-    product_end = pipeflow.RedisOutputEndpoint('product_end', host='192.168.0.10', port=6379, db=0, password=None)
+    product_end = pipeflow.RedisOutputEndpoint('amz_product:input:bsr', host='192.168.0.10', port=6379, db=0, password=None)
     queue = asyncio.LifoQueue()
     inner_input_end = pipeflow.QueueInputEndpoint(queue)
     inner_output_end = pipeflow.QueueOutputEndpoint(queue)
