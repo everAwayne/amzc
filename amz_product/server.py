@@ -51,7 +51,7 @@ async def handle_worker(group, task):
     handle_cls = get_spider_by_platform(task_dct['platform'])
     url = get_url_by_platfrom(task_dct['platform'], task_dct['asin'])
     try:
-        handle = await get_page_handle(handle_cls, url, timeout=90)
+        handle = await get_page_handle(handle_cls, url, timeout=60)
     except RequestError:
         if from_end == 'input_bsr':
             task.set_to('loop_bsr')
