@@ -49,6 +49,7 @@ async def handle_worker(group, task):
         task_count -= 1
         handle_cls = get_spider_by_platform(task_dct['platform'])
         url = task_dct['url']
+        logger.info(url)
         try:
             handle = await get_page_handle(handle_cls, url, timeout=90)
         except RequestError:
@@ -137,6 +138,7 @@ async def handle_task(group, task):
             group.suspend_endpoint('input')
             task_start = True
             task_dct = json.loads(task.get_data().decode('utf-8'))
+            logger.info(task_dct['root_url'])
             filter_ls = [cate.lower() for cate in task_dct['category_filter']]
             task_dct['url'] = task_dct['root_url']
             task_dct['date'] = time.strftime("%Y-%m-%d", time.localtime())
