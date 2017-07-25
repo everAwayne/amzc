@@ -49,7 +49,7 @@ async def handle_worker(group, task):
         task_count -= 1
         handle_cls = get_spider_by_platform(task_dct['platform'])
         url = task_dct['url']
-        logger.info(url)
+        logger.info("%s concurrency: %d" % (url, group.get_cur_concurrency()))
         try:
             handle = await get_page_handle(handle_cls, url, timeout=90)
         except RequestError:
