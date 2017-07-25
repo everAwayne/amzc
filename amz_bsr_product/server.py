@@ -9,7 +9,7 @@ from util.chrequest import get_page_handle, change_ip
 from .spiders.dispatch import get_spider_by_platform
 
 
-MAX_WORKERS = 5
+MAX_WORKERS = 15
 
 
 filter_ls = []

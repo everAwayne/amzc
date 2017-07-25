@@ -6,7 +6,7 @@ from util.chrequest import get_page_handle, change_ip
 from .spiders.dispatch import get_spider_by_platform, get_url_by_platfrom
 
 
-MAX_WORKERS = 10
+MAX_WORKERS = 15
 
 task_cnt = 0
 
