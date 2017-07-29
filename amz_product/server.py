@@ -1,8 +1,9 @@
 import json
 import pipeflow
-from error import RequestError
+from error import RequestError, CaptchaError
 from util.log import logger
 from util.chrequest import get_page_handle, change_ip
+#from util.prrequest import get_page_handle
 from .spiders.dispatch import get_spider_by_platform, get_url_by_platfrom
 
 
@@ -17,7 +18,7 @@ async def handle_worker(group, task):
     [input] task data format:
         JSON:
             {
-                "platfrom": "amazon_us",
+                "platform": "amazon_us",
                 "asin": "B02KDI8NID8",
                 "extra": {}         #optional
             }
@@ -56,6 +57,10 @@ async def handle_worker(group, task):
         if from_end == 'input_bsr':
             task.set_to('loop_bsr')
         return task
+    except CaptchaError:
+        if from_end == 'input_bsr':
+            task.set_to('loop_bsr')
+        return task
     except Exception as exc:
         exc_info = (type(exc), exc, exc.__traceback__)
         taks_info = ' '.join([task_dct['platform'], task_dct['asin']])
@@ -72,7 +77,7 @@ async def handle_worker(group, task):
         info = handle.get_info()
         info['asin'] = task_dct['asin']
         info['platfrom'] = task_dct['platform']
-        info.update(task_dct['extra'])
+        info.update(task_dct.get('extra', {}))
     except Exception as exc:
         exc_info = (type(exc), exc, exc.__traceback__)
         taks_info = ' '.join([task_dct['platform'], task_dct['asin']])

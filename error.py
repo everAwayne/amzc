@@ -4,3 +4,6 @@ class AMZCrawlerError(Exception):
 
 class RequestError(AMZCrawlerError):
     pass
+
+class CaptchaError(AMZCrawlerError):
+    pass

@@ -46,6 +46,8 @@ async def get_page_handle(handle_cls, url, timeout=60):
                 async with aiohttp.ClientSession(headers=headers) as session:
                     async with session.get(url, timeout=timeout) as resp:
                         html = await resp.read()
+                        if resp.status != 200:
+                            logger.error('[%d] %s' % (resp.status, url))
             except Exception as exc:
                 exc_info = (type(exc), exc, exc.__traceback__)
                 logger.error('Request page fail', exc_info=exc_info)
