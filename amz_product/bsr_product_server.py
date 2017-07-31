@@ -1,4 +1,5 @@
 import json
+import redis
 import pipeflow
 from error import RequestError, CaptchaError
 from util.log import logger
@@ -8,6 +9,12 @@ from .spiders.dispatch import get_spider_by_platform, get_url_by_platfrom
 
 
 MAX_WORKERS = 15
+POPT_REDIS_CONF = {'host': '192.168.0.10', 'port': 6379, 'db': 10, 'password': None}
+POPT_KEY_PREFIX = "bestseller:popt:"
+
+
+popt_map = {}
+curve_func = lambda x,a,b:math.log(a/x+1)/b
 
 
 async def handle_worker(group, task):
@@ -74,6 +81,13 @@ async def handle_worker(group, task):
         info['asin'] = task_dct['asin']
         info['platfrom'] = task_dct['platform']
         info.update(task_dct.get('extra', {}))
+        # calculate sales
+        popt_dct = popt_map.get(info['platfrom'], {})
+        cat_name = info['detail_info'].get('cat_1_name', '').strip().lower()
+        cat_rank = info['detail_info'].get('cat_1_rank', -1)
+        info['detail_info']['cat_1_sales'] = -1
+        if cat_name and cat_rank != -1 and popt_dct:
+            info['detail_info']['cat_1_sales'] = curve_func(cat_rank, *popt_dct.get(cat_name, popt_dct['default']))
     except Exception as exc:
         exc_info = (type(exc), exc, exc.__traceback__)
         taks_info = ' '.join([task_dct['platform'], task_dct['asin']])
@@ -87,7 +101,27 @@ async def handle_worker(group, task):
     return result_task
 
 
+def get_popt():
+    global popt_map
+    popt_map.clear()
+    r = redis.Redis(**POPT_REDIS_CONF)
+    key_ls = r.keys(POPT_KEY_PREFIX+'*')
+    for key_name in key_ls:
+        key_name = key_name.decode('utf-8')
+        platform = key_name.replace(POPT_KEY_PREFIX, '')
+        dct = r.hgetall(key_name)
+        if dct:
+            popt_map[platform] = {}
+            for k,v in dct.items():
+                k = k.decode('utf-8')
+                v = v.decode('utf-8')
+                popt_map[platform][k] = json.loads(v)
+    r.connection_pool.disconnect()
+
+
 def run():
+    get_popt()
+    print(popt_map)
     i_bsr_end = pipeflow.RedisInputEndpoint('amz_product:input:bsr', host='192.168.0.10', port=6379, db=0, password=None)
     o_bsr_end = pipeflow.RedisOutputEndpoint('amz_product:output:bsr', host='192.168.0.10', port=6379, db=0, password=None)
     l_bsr_end = pipeflow.RedisOutputEndpoint('amz_product:input:bsr', host='192.168.0.10', port=6379, db=0, password=None)

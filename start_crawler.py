@@ -5,7 +5,7 @@ import argparse
 from util import daemon
 
 
-CRAWLER_LS = ['product', 'bsr']
+CRAWLER_LS = ['product', 'bsr', 'bsr_product']
 
 
 if __name__ == '__main__':
@@ -23,4 +23,6 @@ if __name__ == '__main__':
         from amz_product import server
     elif args.crawler == 'bsr':
         from amz_bsr_product import server
+    elif args.crawler == 'bsr_product':
+        from amz_product import bsr_product_server as server
     server.run()
