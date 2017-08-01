@@ -36,7 +36,7 @@ PLATFORM_DOMAIN_MAP = {
 def get_spider_by_platform(platform):
     return PLATFORM_MAP[platform]
 
-def get_url_by_platfrom(platform, asin):
+def get_url_by_platform(platform, asin):
     domain = PLATFORM_DOMAIN_MAP[platform]
     return "https://{domain}/dp/{asin}/ref=sr_1_1?qid={time}&sr=1-1&keywords={asin}".format(
             domain=domain, asin=asin, time=int(time.time()))

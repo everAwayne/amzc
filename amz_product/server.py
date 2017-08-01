@@ -4,7 +4,7 @@ from error import RequestError, CaptchaError
 from util.log import logger
 from util.chrequest import get_page_handle, change_ip
 #from util.prrequest import get_page_handle
-from .spiders.dispatch import get_spider_by_platform, get_url_by_platfrom
+from .spiders.dispatch import get_spider_by_platform, get_url_by_platform
 
 
 MAX_WORKERS = 15
@@ -46,7 +46,7 @@ async def handle_worker(group, task):
     logger.info("%s %s" % (task_dct['platform'], task_dct['asin']))
 
     handle_cls = get_spider_by_platform(task_dct['platform'])
-    url = get_url_by_platfrom(task_dct['platform'], task_dct['asin'])
+    url = get_url_by_platform(task_dct['platform'], task_dct['asin'])
     try:
         handle = await get_page_handle(handle_cls, url, timeout=60)
     except RequestError:
@@ -72,7 +72,7 @@ async def handle_worker(group, task):
     try:
         info = handle.get_info()
         info['asin'] = task_dct['asin']
-        info['platfrom'] = task_dct['platform']
+        info['platform'] = task_dct['platform']
         info.update(task_dct.get('extra', {}))
     except Exception as exc:
         exc_info = (type(exc), exc, exc.__traceback__)

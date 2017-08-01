@@ -6,6 +6,7 @@ import pipeflow
 from error import RequestError
 from util.log import logger
 from util.chrequest import get_page_handle, change_ip
+#from util.prrequest import get_page_handle
 from .spiders.dispatch import get_spider_by_platform
 
 

@@ -1,11 +1,12 @@
 import json
+import math
 import redis
 import pipeflow
 from error import RequestError, CaptchaError
 from util.log import logger
 from util.chrequest import get_page_handle, change_ip
 #from util.prrequest import get_page_handle
-from .spiders.dispatch import get_spider_by_platform, get_url_by_platfrom
+from .spiders.dispatch import get_spider_by_platform, get_url_by_platform
 
 
 MAX_WORKERS = 15
@@ -53,7 +54,7 @@ async def handle_worker(group, task):
     logger.info("%s %s" % (task_dct['platform'], task_dct['asin']))
 
     handle_cls = get_spider_by_platform(task_dct['platform'])
-    url = get_url_by_platfrom(task_dct['platform'], task_dct['asin'])
+    url = get_url_by_platform(task_dct['platform'], task_dct['asin'])
     try:
         handle = await get_page_handle(handle_cls, url, timeout=60)
     except RequestError:
@@ -79,10 +80,10 @@ async def handle_worker(group, task):
     try:
         info = handle.get_info()
         info['asin'] = task_dct['asin']
-        info['platfrom'] = task_dct['platform']
+        info['platform'] = task_dct['platform']
         info.update(task_dct.get('extra', {}))
         # calculate sales
-        popt_dct = popt_map.get(info['platfrom'], {})
+        popt_dct = popt_map.get(info['platform'], {})
         cat_name = info['detail_info'].get('cat_1_name', '').strip().lower()
         cat_rank = info['detail_info'].get('cat_1_rank', -1)
         info['detail_info']['cat_1_sales'] = -1
@@ -121,7 +122,6 @@ def get_popt():
 
 def run():
     get_popt()
-    print(popt_map)
     i_bsr_end = pipeflow.RedisInputEndpoint('amz_product:input:bsr', host='192.168.0.10', port=6379, db=0, password=None)
     o_bsr_end = pipeflow.RedisOutputEndpoint('amz_product:output:bsr', host='192.168.0.10', port=6379, db=0, password=None)
     l_bsr_end = pipeflow.RedisOutputEndpoint('amz_product:input:bsr', host='192.168.0.10', port=6379, db=0, password=None)
