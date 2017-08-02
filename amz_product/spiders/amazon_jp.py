@@ -221,3 +221,14 @@ class AMZJPProductInfo:
                             bsr_dct['cat_1_rank'] = rank
                             bsr_dct['cat_1_name'] = name
         return bsr_dct
+
+
+    def get_relative_asin(self):
+        """Extract asin from 'bought together' and 'also bought'
+        """
+        asin_set = set(self.soup.xpath("//div[@id='sims-fbt-content']//input[contains(@name, 'discoveredAsins')]/@value"))
+        ls = self.soup.xpath("//div[@id='purchase-sims-feature']//div[@data-a-carousel-options]/@data-a-carousel-options")
+        if ls:
+            asin_set.update(json.loads(ls[0])['ajax']['id_list'])
+
+        return list(asin_set)
