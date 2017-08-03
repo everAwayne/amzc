@@ -7,7 +7,6 @@ import pipeflow
 from util.log import logger
 
 
-#RELATIONSHIP_REDIS_CONF = {'host': '45.35.226.130', 'port': 13111, 'db': 11, 'password': 'c18d1ba0f01f15b2168297663a85abf5'}
 RELATIONSHIP_REDIS_CONF = {'host': '192.168.0.10', 'port': 6379, 'db': 11, 'password': None}
 RELATIONSHIP_KEY_PREFIX = "asin_rlts:"
 BATCH_SIZE = 300
