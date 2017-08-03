@@ -26,7 +26,10 @@ async def handle_worker(group, task):
             {
                 "platform": "amazon_us",
                 "asin": "B02KDI8NID8",
-                "extra": {}         #optional
+                "extra": {
+                    "bs_cate": [],
+                    "date": "2017-08-08"
+                }
             }
     [output] result data format:
         JSON:
@@ -78,7 +81,22 @@ async def handle_worker(group, task):
         return
 
     try:
-        info = handle.get_info()
+        info = {}
+        info['fba'] = 1 if handle.is_fba() else 0
+        info['title'] = handle.get_title()['title']
+        info['brand'] = handle.get_brand()['brand']
+        tmp_info = handle.get_price()
+        info['price'] = tmp_info['price']
+        info['discount'] = tmp_info['discount']
+        info['img'] = handle.get_img_info()['img']
+        tmp_info = handle.get_review()
+        info['review'] = tmp_info['review_score']
+        info['review_count'] = tmp_info['review_num']
+        tmp_info = handle.get_merchants_info()
+        info['merchant'] = tmp_info['merchant']
+        info['merchant_id'] = tmp_info['merchant_id']
+        info['detail_info'] = handle.get_bsr_info()
+        # extra info
         info['asin'] = task_dct['asin']
         info['platform'] = task_dct['platform']
         info.update(task_dct.get('extra', {}))
@@ -89,6 +107,12 @@ async def handle_worker(group, task):
         info['detail_info']['cat_1_sales'] = -1
         if cat_name and cat_rank != -1 and popt_dct:
             info['detail_info']['cat_1_sales'] = curve_func(cat_rank, *popt_dct.get(cat_name, popt_dct['default']))
+
+        relation_info = {}
+        relation_info['asin'] = task_dct['asin']
+        relation_info['platform'] = task_dct['platform']
+        relation_info['asin_ls'] = handle.get_relative_asin()
+        relation_info['date'] = task_dct['extra']['date']
     except Exception as exc:
         exc_info = (type(exc), exc, exc.__traceback__)
         taks_info = ' '.join([task_dct['platform'], task_dct['asin']])
@@ -96,10 +120,15 @@ async def handle_worker(group, task):
         exc.__traceback__ = None
         return
 
-    result_task = pipeflow.Task(json.dumps(info).encode('utf-8'))
+    task_ls = []
+    task = pipeflow.Task(json.dumps(info).encode('utf-8'))
     if from_end == 'input_bsr':
-        result_task.set_to('output_bsr')
-    return result_task
+        task.set_to('output_bsr')
+        task_ls.append(task)
+    task = pipeflow.Task(json.dumps(relation_info).encode('utf-8'))
+    task.set_to('output_rlts')
+    task_ls.append(task)
+    return task_ls
 
 
 def get_popt():
@@ -125,6 +154,7 @@ def run():
     i_bsr_end = pipeflow.RedisInputEndpoint('amz_product:input:bsr', host='192.168.0.10', port=6379, db=0, password=None)
     o_bsr_end = pipeflow.RedisOutputEndpoint('amz_product:output:bsr', host='192.168.0.10', port=6379, db=0, password=None)
     l_bsr_end = pipeflow.RedisOutputEndpoint('amz_product:input:bsr', host='192.168.0.10', port=6379, db=0, password=None)
+    o_rlts_end = pipeflow.RedisOutputEndpoint('amz_asin_relationship:input', host='192.168.0.10', port=6379, db=0, password=None)
 
     server = pipeflow.Server()
     server.add_worker(change_ip)
@@ -133,4 +163,5 @@ def run():
     group.add_input_endpoint('input_bsr', i_bsr_end)
     group.add_output_endpoint('output_bsr', o_bsr_end)
     group.add_output_endpoint('loop_bsr', l_bsr_end)
+    group.add_output_endpoint('output_rlts', o_rlts_end)
     server.run()
