@@ -125,9 +125,10 @@ async def handle_worker(group, task):
     if from_end == 'input_bsr':
         task.set_to('output_bsr')
         task_ls.append(task)
-    task = pipeflow.Task(json.dumps(relation_info).encode('utf-8'))
-    task.set_to('output_rlts')
-    task_ls.append(task)
+    if relation_info['asin_ls']:
+        task = pipeflow.Task(json.dumps(relation_info).encode('utf-8'))
+        task.set_to('output_rlts')
+        task_ls.append(task)
     return task_ls
 
 
