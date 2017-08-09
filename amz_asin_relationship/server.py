@@ -10,10 +10,10 @@ from util.log import logger
 
 RELATIONSHIP_REDIS_CONF = {'host': '192.168.0.10', 'port': 6379, 'db': 11, 'password': None}
 RELATIONSHIP_KEY_PREFIX = "asin_rlts:"
-BATCH_SIZE = 300
+BATCH_SIZE = 2000
 FLUSH_INTERVAL = 60
 DEL_INTERVAL = 10
-DEL_BATCH = 500
+DEL_BATCH = 1000
 FREQUENCY_DAY = 7
 CACHE_LIFETIME_DAY = 2 * FREQUENCY_DAY
 
@@ -73,6 +73,10 @@ def flush_to_cache(dct):
         pipeline.hmset(k, result_dct)
     redis_execute(pipeline.execute)()
 
+    global last_flush_time
+    last_flush_time = time.time()
+    dct.clear()
+
 
 async def handle_worker(group, task):
     """Handle amz_asin_relationship task
@@ -83,14 +87,20 @@ async def handle_worker(group, task):
                 "platform": "amazon_us",
                 "asin": "B02KDI8NID8",
                 "date": "2017-08-08",
-                "asin_ls": []
+                "bought_together_ls": [],
+                "also_bought_ls": [],
             }
     """
     task_dct = json.loads(task.get_data().decode('utf-8'))
-    asin_ls = task_dct['asin_ls']
+    bought_together_ls = task_dct['bought_together_ls']
+    also_bought_ls = task_dct['also_bought_ls']
     time_now = int(time.mktime(time.strptime(task_dct['date'], "%Y-%m-%d")))
-    for asin in asin_ls:
-        dct = data_dct.setdefault(RELATIONSHIP_KEY_PREFIX + task_dct['platform'], {})
+    for asin in bought_together_ls:
+        dct = data_dct.setdefault(RELATIONSHIP_KEY_PREFIX + 'bought_together:' + task_dct['platform'], {})
+        dct = dct.setdefault(asin, {})
+        dct[task_dct['asin']] = time_now
+    for asin in also_bought_ls:
+        dct = data_dct.setdefault(RELATIONSHIP_KEY_PREFIX + 'also_bought:' + task_dct['platform'], {})
         dct = dct.setdefault(asin, {})
         dct[task_dct['asin']] = time_now
     if sum(map(lambda x:len(x), data_dct.values())) > BATCH_SIZE:
@@ -110,6 +120,7 @@ async def crontab(server):
 
 async def del_expire(server):
     while True:
+        await asyncio.sleep(86400 * FREQUENCY_DAY)
         time_now = time.mktime(time.strptime(time.strftime("%Y-%m-%d", time.localtime()),"%Y-%m-%d"))
         has_expire = int(time_now) - 86400 * CACHE_LIFETIME_DAY
         key_ls = redis_execute(r.keys)(RELATIONSHIP_KEY_PREFIX+'*')
@@ -127,7 +138,6 @@ async def del_expire(server):
                 if del_ls:
                     redis_execute(r.hdel)(key, *del_ls)
                 await asyncio.sleep(DEL_INTERVAL)
-        await asyncio.sleep(86400 * FREQUENCY_DAY)
 
 
 def run():

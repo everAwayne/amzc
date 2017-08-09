@@ -226,9 +226,10 @@ class AMZINProductInfo:
     def get_relative_asin(self):
         """Extract asin from 'bought together' and 'also bought'
         """
-        asin_set = set(self.soup.xpath("//div[@id='sims-fbt-content']//input[contains(@name, 'discoveredAsins')]/@value"))
+        set_1 = set_2 = set([])
+        set_1 = set(self.soup.xpath("//div[@id='sims-fbt-content']//input[contains(@name, 'discoveredAsins')]/@value"))
         ls = self.soup.xpath("//div[@id='purchase-sims-feature']//div[@data-a-carousel-options]/@data-a-carousel-options")
         if ls:
-            asin_set.update(json.loads(ls[0])['ajax']['id_list'])
+            set_2 = set(json.loads(ls[0])['ajax']['id_list'])
 
-        return list(asin_set)
+        return {'bought_together': list(set_1), 'also_bought': list(set_2)}

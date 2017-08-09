@@ -59,7 +59,7 @@ async def handle_worker(group, task):
     handle_cls = get_spider_by_platform(task_dct['platform'])
     url = get_url_by_platform(task_dct['platform'], task_dct['asin'])
     try:
-        handle = await get_page_handle(handle_cls, url, timeout=60)
+        handle = await get_page_handle(handle_cls, url, timeout=70)
     except RequestError:
         if from_end == 'input_bsr':
             task.set_to('loop_bsr')
@@ -111,7 +111,9 @@ async def handle_worker(group, task):
         relation_info = {}
         relation_info['asin'] = task_dct['asin']
         relation_info['platform'] = task_dct['platform']
-        relation_info['asin_ls'] = handle.get_relative_asin()
+        tmp_info = handle.get_relative_asin()
+        relation_info['bought_together_ls'] = tmp_info['bought_together']
+        relation_info['also_bought_ls'] = tmp_info['also_bought']
         relation_info['date'] = task_dct['extra']['date']
     except Exception as exc:
         exc_info = (type(exc), exc, exc.__traceback__)
@@ -125,7 +127,7 @@ async def handle_worker(group, task):
     if from_end == 'input_bsr':
         task.set_to('output_bsr')
         task_ls.append(task)
-    if relation_info['asin_ls']:
+    if relation_info['bought_together_ls'] or relation_info['also_bought_ls']:
         task = pipeflow.Task(json.dumps(relation_info).encode('utf-8'))
         task.set_to('output_rlts')
         task_ls.append(task)
