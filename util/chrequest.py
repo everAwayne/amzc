@@ -92,15 +92,15 @@ async def change_ip(server):
             if ret == 0:
                 break
             else:
-                logger.error('[%d]ppp0 stop error' % change_ip_cnt)
-                asyncio.sleep(10)
+                logger.error('[%d]ppp0 stop error: [%d]' % (change_ip_cnt, ret))
+                await asyncio.sleep(10)
         while True:
             ret = os.system('ifup ppp0')
             if ret == 0:
                 break
             else:
-                logger.error('[%d]ppp0 start error' % change_ip_cnt)
-                asyncio.sleep(10)
+                logger.error('[%d]ppp0 start error: [%d]' % (change_ip_cnt, ret))
+                await asyncio.sleep(10)
         logger.info("[%d]change ip end" % change_ip_cnt)
         finish_change_event.set()
         finish_change_event.clear()

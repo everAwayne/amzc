@@ -33,6 +33,7 @@ async def handle_worker(group, task):
         JSON:
             {
                 'asin': 'B02KDI8NID8',
+                'platform': 'amazon_us',
                 'title': 'Active Wow Teeth Whitening Charcoal Powder Natural',
                 'brand': 'Active Wow',
                 'price': 24.79,
