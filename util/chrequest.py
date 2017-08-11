@@ -87,19 +87,31 @@ async def change_ip(server):
         assert event_wait, "event_wait should more than 0"
         assert event_wait==in_request, "event_wait should be equal to running_cnt"
         logger.info("[%d]change ip start" % change_ip_cnt)
+        command_t = 0
+        fail_cnt = 0
         while True:
-            ret = os.system('ifdown ppp0')
+            if command_t == 0:
+                ret = os.system('ifdown ppp0')
+            else:
+                ret = os.system('pppoe-stop')
             if ret == 0:
                 break
             else:
-                logger.error('[%d]ppp0 stop error: [%d]' % (change_ip_cnt, ret))
+                logger.error('[%d][%d]ppp0 stop error: [%d]' % (change_ip_cnt, command_t, ret))
+                if command_t == 0:
+                    fail_cnt += 1
+                    if fail_cnt >= 3:
+                        command_t = 1
                 await asyncio.sleep(10)
         while True:
-            ret = os.system('ifup ppp0')
+            if command_t == 0:
+                ret = os.system('ifup ppp0')
+            else:
+                ret = os.system('pppoe-start')
             if ret == 0:
                 break
             else:
-                logger.error('[%d]ppp0 start error: [%d]' % (change_ip_cnt, ret))
+                logger.error('[%d][%d]ppp0 start error: [%d]' % (change_ip_cnt, command_t, ret))
                 await asyncio.sleep(10)
         logger.info("[%d]change ip end" % change_ip_cnt)
         finish_change_event.set()
