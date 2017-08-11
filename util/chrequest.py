@@ -1,4 +1,4 @@
-import os
+import subprocess
 import asyncio
 import aiohttp
 from error import RequestError
@@ -91,13 +91,17 @@ async def change_ip(server):
         fail_cnt = 0
         while True:
             if command_t == 0:
-                ret = os.system('ifdown ppp0')
+                ret = subprocess.run('ifdown ppp0', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             else:
-                ret = os.system('pppoe-stop')
-            if ret == 0:
+                ret = subprocess.run('pppoe-stop', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if ret.returncode == 0:
                 break
             else:
-                logger.error('[%d][%d]ppp0 stop error: [%d]' % (change_ip_cnt, command_t, ret))
+                logger.error('[%d][%d]ppp0 stop error: [%d]' % (change_ip_cnt, command_t, ret.returncode))
+                if ret.stdout:
+                    logger.error('%s' % ret.stdout)
+                if ret.stderr:
+                    logger.error('%s' % ret.stderr)
                 if command_t == 0:
                     fail_cnt += 1
                     if fail_cnt >= 3:
@@ -105,13 +109,17 @@ async def change_ip(server):
                 await asyncio.sleep(10)
         while True:
             if command_t == 0:
-                ret = os.system('ifup ppp0')
+                ret = subprocess.run('ifup ppp0', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             else:
-                ret = os.system('pppoe-start')
-            if ret == 0:
+                ret = subprocess.run('pppoe-start', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if ret.returncode == 0:
                 break
             else:
-                logger.error('[%d][%d]ppp0 start error: [%d]' % (change_ip_cnt, command_t, ret))
+                logger.error('[%d][%d]ppp0 start error: [%d]' % (change_ip_cnt, command_t, ret.returncode))
+                if ret.stdout:
+                    logger.error('%s' % ret.stdout)
+                if ret.stderr:
+                    logger.error('%s' % ret.stderr)
                 await asyncio.sleep(10)
         logger.info("[%d]change ip end" % change_ip_cnt)
         finish_change_event.set()
