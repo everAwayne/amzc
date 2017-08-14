@@ -1,6 +1,7 @@
 import subprocess
 import asyncio
 import aiohttp
+import concurrent.futures
 from error import RequestError
 from .headers import get_header
 from .log import logger
@@ -71,6 +72,11 @@ async def get_page_handle(handle_cls, url, timeout=60):
             start_change_event.clear()
 
 
+def execute(command):
+    ret = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return ret
+
+
 async def change_ip(server):
     """Change machine IP(blocking)
 
@@ -81,41 +87,36 @@ async def change_ip(server):
     global event_wait
     global in_request
     global change_ip_cnt
+    loop = server.get_event_loop()
+    executor = concurrent.futures.ProcessPoolExecutor(1)
+    # initial process pool, make it to fork at the beginning
+    future = loop.run_in_executor(executor, execute, 'hostname')
+    await future
     while True:
         change_ip_cnt += 1
         await start_change_event.wait()
         assert event_wait, "event_wait should more than 0"
         assert event_wait==in_request, "event_wait should be equal to running_cnt"
         logger.info("[%d]change ip start" % change_ip_cnt)
-        command_t = 0
-        fail_cnt = 0
         while True:
-            if command_t == 0:
-                ret = subprocess.run('ifdown ppp0', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            else:
-                ret = subprocess.run('pppoe-stop', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            future = loop.run_in_executor(executor, execute, 'ifdown ppp0')
+            ret = await future
             if ret.returncode == 0:
                 break
             else:
-                logger.error('[%d][%d]ppp0 stop error: [%d]' % (change_ip_cnt, command_t, ret.returncode))
+                logger.error('[%d]ppp0 stop error: [%d]' % (change_ip_cnt, ret.returncode))
                 if ret.stdout:
                     logger.error('%s' % ret.stdout)
                 if ret.stderr:
                     logger.error('%s' % ret.stderr)
-                if command_t == 0:
-                    fail_cnt += 1
-                    if fail_cnt >= 3:
-                        command_t = 1
                 await asyncio.sleep(10)
         while True:
-            if command_t == 0:
-                ret = subprocess.run('ifup ppp0', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            else:
-                ret = subprocess.run('pppoe-start', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            future = loop.run_in_executor(executor, execute, 'ifup ppp0')
+            ret = await future
             if ret.returncode == 0:
                 break
             else:
-                logger.error('[%d][%d]ppp0 start error: [%d]' % (change_ip_cnt, command_t, ret.returncode))
+                logger.error('[%d]ppp0 start error: [%d]' % (change_ip_cnt, ret.returncode))
                 if ret.stdout:
                     logger.error('%s' % ret.stdout)
                 if ret.stderr:
