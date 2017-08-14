@@ -49,10 +49,12 @@ async def get_page_handle(handle_cls, url, timeout=60):
                         html = await resp.read()
                         if resp.status != 200:
                             logger.error('[%d] %s' % (resp.status, url))
-            except Exception as exc:
-                exc_info = (type(exc), exc, exc.__traceback__)
-                logger.error('Request page fail', exc_info=exc_info)
-                exc.__traceback__ = None
+            #except Exception as exc:
+            except:
+                #exc_info = (type(exc), exc, exc.__traceback__)
+                #logger.error('Request page fail', exc_info=exc_info)
+                logger.error('Request page fail')
+                #exc.__traceback__ = None
                 raise RequestError
 
             handle = handle_cls(html)
