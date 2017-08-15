@@ -1,3 +1,4 @@
+import os
 import subprocess
 import asyncio
 import aiohttp
@@ -79,6 +80,13 @@ def execute(command):
     return ret
 
 
+def found_ppp0():
+    ls = os.listdir('/sys/class/net')
+    if 'ppp0' in ls:
+        return True
+    return False
+
+
 async def change_ip(server):
     """Change machine IP(blocking)
 
@@ -106,6 +114,8 @@ async def change_ip(server):
             if ret.returncode == 0:
                 break
             else:
+                if not found_ppp0():
+                    break
                 logger.error('[%d]ppp0 stop error: [%d]' % (change_ip_cnt, ret.returncode))
                 if ret.stdout:
                     logger.error('%s' % ret.stdout)
@@ -118,6 +128,8 @@ async def change_ip(server):
             if ret.returncode == 0:
                 break
             else:
+                if found_ppp0():
+                    break
                 logger.error('[%d]ppp0 start error: [%d]' % (change_ip_cnt, ret.returncode))
                 if ret.stdout:
                     logger.error('%s' % ret.stdout)
