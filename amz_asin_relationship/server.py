@@ -60,12 +60,14 @@ def flush_to_cache(dct):
     for k, v in zip(dct.keys(), ls):
         result_dct = {}
         for asin, data in zip(dct[k].keys(), v):
-            has_expire = max(dct[k][asin].values()) - 86400 * CACHE_LIFETIME_DAY
+            has_expire = max(map(lambda x:x if isinstance(x, int) else x['t'], dct[k][asin].values())) - 86400 * CACHE_LIFETIME_DAY
             if data is not None:
                 cache_dct = json.loads(data.decode('utf-8'))
                 cache_dct.update(dct[k][asin])
                 for ck, cv in list(cache_dct.items()):
-                    if cv <= has_expire:
+                    if isinstance(cv, int) and cv <= has_expire:
+                        del cache_dct[ck]
+                    elif isinstance(cv, dct) and cv['t'] <= has_expire:
                         del cache_dct[ck]
             else:
                 cache_dct = dct[k][asin]
@@ -95,14 +97,16 @@ async def handle_worker(group, task):
     bought_together_ls = task_dct['bought_together_ls']
     also_bought_ls = task_dct['also_bought_ls']
     time_now = int(time.mktime(time.strptime(task_dct['date'], "%Y-%m-%d")))
-    for asin in bought_together_ls:
+    for i in range(len(bought_together_ls)):
+        asin = bought_together_ls[i]
         dct = data_dct.setdefault(RELATIONSHIP_KEY_PREFIX + 'bought_together:' + task_dct['platform'], {})
         dct = dct.setdefault(asin, {})
-        dct[task_dct['asin']] = time_now
-    for asin in also_bought_ls:
+        dct[task_dct['asin']] = {'t': time_now, 'i': i}
+    for i in range(len(also_bought_ls)):
+        asin = also_bought_ls[i]
         dct = data_dct.setdefault(RELATIONSHIP_KEY_PREFIX + 'also_bought:' + task_dct['platform'], {})
         dct = dct.setdefault(asin, {})
-        dct[task_dct['asin']] = time_now
+        dct[task_dct['asin']] = {'t': time_now, 'i': i}
     if sum(map(lambda x:len(x), data_dct.values())) > BATCH_SIZE:
         flush_to_cache(data_dct)
 
@@ -133,7 +137,7 @@ async def del_expire(server):
                 del_ls = []
                 for k, v in ret_dct.items():
                     dct = json.loads(v.decode('utf-8'))
-                    if max(dct.values()) <= has_expire:
+                    if max(map(lambda x:x if isinstance(x, int) else x['t'], dct.values())) <= has_expire:
                         del_ls.append(k)
                 if del_ls:
                     redis_execute(r.hdel)(key, *del_ls)
