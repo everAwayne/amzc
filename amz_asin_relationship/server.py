@@ -18,7 +18,7 @@ FREQUENCY_DAY = 7
 CACHE_LIFETIME_DAY = 2 * FREQUENCY_DAY
 
 conf = {
-    "socket_timeout": 30,
+    "socket_timeout": 40,
     "socket_connect_timeout": 15,
     "socket_keepalive": True,
     "socket_keepalive_options": {
@@ -60,14 +60,12 @@ def flush_to_cache(dct):
     for k, v in zip(dct.keys(), ls):
         result_dct = {}
         for asin, data in zip(dct[k].keys(), v):
-            has_expire = max(map(lambda x:x if isinstance(x, int) else x['t'], dct[k][asin].values())) - 86400 * CACHE_LIFETIME_DAY
+            has_expire = max(map(lambda x:x['t'], dct[k][asin].values())) - 86400 * CACHE_LIFETIME_DAY
             if data is not None:
                 cache_dct = json.loads(data.decode('utf-8'))
                 cache_dct.update(dct[k][asin])
                 for ck, cv in list(cache_dct.items()):
-                    if isinstance(cv, int) and cv <= has_expire:
-                        del cache_dct[ck]
-                    elif isinstance(cv, dct) and cv['t'] <= has_expire:
+                    if cv['t'] <= has_expire:
                         del cache_dct[ck]
             else:
                 cache_dct = dct[k][asin]
@@ -137,7 +135,7 @@ async def del_expire(server):
                 del_ls = []
                 for k, v in ret_dct.items():
                     dct = json.loads(v.decode('utf-8'))
-                    if max(map(lambda x:x if isinstance(x, int) else x['t'], dct.values())) <= has_expire:
+                    if max(map(lambda x:x['t'], dct.values())) <= has_expire:
                         del_ls.append(k)
                 if del_ls:
                     redis_execute(r.hdel)(key, *del_ls)
