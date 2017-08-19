@@ -1,5 +1,6 @@
 import json
 import redis
+import functools
 import pipeflow
 from error import RequestError, CaptchaError
 from util.log import logger
@@ -99,11 +100,28 @@ def get_popt():
     global popt_map
     popt_map.clear()
     r = redis.Redis(**POPT_REDIS_CONF)
-    key_ls = r.keys(POPT_KEY_PREFIX+'*')
+
+    def redis_execute(func):
+        @functools.wraps(func)
+        def redis_execute_wrapper(*args, **kwargs):
+            while True:
+                try:
+                    return func(*args, **kwargs)
+                except redis.ConnectionError as e:
+                    logger.error('Redis ConnectionError')
+                    r.connection_pool.disconnect()
+                    continue
+                except redis.TimeoutError as e:
+                    logger.error('Redis TimeoutError')
+                    r.connection_pool.disconnect()
+                    continue
+        return redis_execute_wrapper
+
+    key_ls = redis_execute(r.keys)(POPT_KEY_PREFIX+'*')
     for key_name in key_ls:
         key_name = key_name.decode('utf-8')
         platform = key_name.replace(POPT_KEY_PREFIX, '')
-        dct = r.hgetall(key_name)
+        dct = redis_execute(r.hgetall)(key_name)
         if dct:
             popt_map[platform] = {}
             for k,v in dct.items():
