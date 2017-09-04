@@ -51,6 +51,7 @@ class AMZCAProductInfo:
             'merchant': merchant_info['merchant'],
             'merchant_id': merchant_info['merchant_id'],
             'detail_info': bsr_info,
+            'relative_info': relative_info,
             }
 
     def get_title(self):

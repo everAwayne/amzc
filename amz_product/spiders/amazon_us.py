@@ -37,6 +37,7 @@ class AMZUSProductInfo:
         review_info = self.get_review()
         merchant_info = self.get_merchants_info()
         bsr_info = self.get_bsr_info()
+        relative_info = self.get_relative_asin()
 
         return {
             'fba': 1 if is_fba else 0,
@@ -51,6 +52,7 @@ class AMZUSProductInfo:
             'merchant': merchant_info['merchant'],
             'merchant_id': merchant_info['merchant_id'],
             'detail_info': bsr_info,
+            'relative_info': relative_info,
             }
 
     def get_title(self):

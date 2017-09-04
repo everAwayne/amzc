@@ -1,20 +1,13 @@
 import json
-import redis
-import functools
 import pipeflow
 from error import RequestError, CaptchaError
 from util.log import logger
 from util.chrequest import get_page_handle, change_ip
+from util.task_protocal import TaskProtocal
 from .spiders.dispatch import get_spider_by_platform, get_url_by_platform
-from .modules import bsr, product
 
 
 MAX_WORKERS = 15
-POPT_REDIS_CONF = {'host': '192.168.0.10', 'port': 6379, 'db': 10, 'password': None}
-POPT_KEY_PREFIX = "bestseller:popt:"
-
-
-popt_map = {}
 
 
 async def handle_worker(group, task):
@@ -24,11 +17,7 @@ async def handle_worker(group, task):
         JSON:
             {
                 "platform": "amazon_us",
-                "asin": "B02KDI8NID8",
-                "extra": {
-                    "bs_cate": [],
-                    "date": "2017-08-08"
-                }
+                "asin": "B02KDI8NID8"
             }
     [output] result data format:
         JSON:
@@ -44,16 +33,20 @@ async def handle_worker(group, task):
                 'detail_info': {
                     'cat_1_rank': 5,
                     'cat_1_name': 'Beauty & Personal Care'
-                    },
+                },
+                'relative_info': {
+                    'bought_together': [],
+                    'also_bought': [],
+                },
                 'fba': 1,
                 'review': 4.6,
                 'review_count': 9812,
                 'img': 'https://images-na.ssl-images-amazon.com/images/I/514RSPIJMKL.jpg'
             }
     """
-    from_end = task.get_from()
-    task_dct = json.loads(task.get_data().decode('utf-8'))
-
+    tp = TaskProtocal(task)
+    from_end = tp.get_from()
+    task_dct = tp.get_data()
     logger.info("%s %s" % (task_dct['platform'], task_dct['asin']))
 
     handle_cls = get_spider_by_platform(task_dct['platform'])
@@ -61,17 +54,17 @@ async def handle_worker(group, task):
     try:
         handle = await get_page_handle(handle_cls, url, timeout=70)
     except RequestError:
-        if from_end == 'input_bsr':
-            task.set_to('loop_bsr')
-        elif from_end == 'input_product':
-            task.set_to('loop_product')
-        return task
+        if from_end == 'routine_input':
+            tp.set_to('routine_input')
+        elif from_end == 'input':
+            tp.set_to('input')
+        return tp.to_task()
     except CaptchaError:
-        if from_end == 'input_bsr':
-            task.set_to('loop_bsr')
-        elif from_end == 'input_product':
-            task.set_to('loop_product')
-        return task
+        if from_end == 'routine_input':
+            tp.set_to('routine_input')
+        elif from_end == 'input':
+            tp.set_to('input')
+        return tp.to_task()
     except Exception as exc:
         exc_info = (type(exc), exc, exc.__traceback__)
         taks_info = ' '.join([task_dct['platform'], task_dct['asin']])
@@ -84,10 +77,15 @@ async def handle_worker(group, task):
         return
 
     try:
-        if from_end == 'input_bsr':
-            return bsr.process(handle, task_dct, popt_map)
-        elif from_end == 'input_product':
-            return product.process(handle, task_dct)
+        info = handle.get_info()
+        # extra info
+        info['asin'] = task_dct['asin']
+        info['platform'] = task_dct['platform']
+        if task_dct.get('extra'):
+            info['extra'] = task_dct['extra']
+        new_tp = tp.new_task(info)
+        new_tp.set_to('output')
+        return new_tp.to_task()
     except Exception as exc:
         exc_info = (type(exc), exc, exc.__traceback__)
         taks_info = ' '.join([task_dct['platform'], task_dct['asin']])
@@ -96,62 +94,21 @@ async def handle_worker(group, task):
         return
 
 
-def get_popt():
-    global popt_map
-    popt_map.clear()
-    r = redis.Redis(**POPT_REDIS_CONF)
-
-    def redis_execute(func):
-        @functools.wraps(func)
-        def redis_execute_wrapper(*args, **kwargs):
-            while True:
-                try:
-                    return func(*args, **kwargs)
-                except redis.ConnectionError as e:
-                    logger.error('Redis ConnectionError')
-                    r.connection_pool.disconnect()
-                    continue
-                except redis.TimeoutError as e:
-                    logger.error('Redis TimeoutError')
-                    r.connection_pool.disconnect()
-                    continue
-        return redis_execute_wrapper
-
-    key_ls = redis_execute(r.keys)(POPT_KEY_PREFIX+'*')
-    for key_name in key_ls:
-        key_name = key_name.decode('utf-8')
-        platform = key_name.replace(POPT_KEY_PREFIX, '')
-        dct = redis_execute(r.hgetall)(key_name)
-        if dct:
-            popt_map[platform] = {}
-            for k,v in dct.items():
-                k = k.decode('utf-8')
-                v = v.decode('utf-8')
-                popt_map[platform][k] = json.loads(v)
-    r.connection_pool.disconnect()
-
-
 def run():
-    get_popt()
-    i_bsr_end = pipeflow.RedisInputEndpoint('amz_product:input:bsr', host='192.168.0.10', port=6379, db=0, password=None)
-    o_bsr_end = pipeflow.RedisOutputEndpoint('amz_product:output:bsr', host='192.168.0.10', port=6379, db=0, password=None)
-    l_bsr_end = pipeflow.RedisOutputEndpoint('amz_product:input:bsr', host='192.168.0.10', port=6379, db=0, password=None)
-    o_rlts_end = pipeflow.RedisOutputEndpoint('amz_asin_relationship:input', host='192.168.0.10', port=6379, db=0, password=None)
-
-    i_product_end = pipeflow.RedisInputEndpoint('amz_product:input:product', host='192.168.0.10', port=6379, db=0, password=None)
-    o_product_end = pipeflow.RedisOutputEndpoint('amz_product:output:product', host='192.168.0.10', port=6379, db=0, password=None)
-    l_product_end = pipeflow.RedisOutputEndpoint('amz_product:input:product', host='192.168.0.10', port=6379, db=0, password=None)
+    routine_input_end = pipeflow.RedisInputEndpoint('amz_product:routine_input', host='192.168.0.10', port=6379, db=0, password=None)
+    b_routine_input_end = pipeflow.RedisOutputEndpoint('amz_product:routine_input', host='192.168.0.10', port=6379, db=0, password=None)
+    input_end = pipeflow.RedisInputEndpoint('amz_product:input', host='192.168.0.10', port=6379, db=0, password=None)
+    b_input_end = pipeflow.RedisOutputEndpoint('amz_product:input', host='192.168.0.10', port=6379, db=0, password=None)
+    output_end = pipeflow.RedisOutputEndpoint('amz_product:output', host='192.168.0.10', port=6379, db=0, password=None)
 
     server = pipeflow.Server()
     server.add_worker(change_ip)
     group = server.add_group('main', MAX_WORKERS)
     group.set_handle(handle_worker)
-    group.add_input_endpoint('input_bsr', i_bsr_end)
-    group.add_output_endpoint('output_bsr', o_bsr_end)
-    group.add_output_endpoint('loop_bsr', l_bsr_end)
-    group.add_output_endpoint('output_rlts', o_rlts_end)
+    group.add_input_endpoint('routine_input', routine_input_end)
+    group.add_output_endpoint('routine_input_back', b_routine_input_end)
 
-    group.add_input_endpoint('input_product', i_product_end)
-    group.add_output_endpoint('output_product', o_product_end)
-    group.add_output_endpoint('loop_product', l_product_end)
+    group.add_input_endpoint('input', input_end)
+    group.add_output_endpoint('input_back', b_input_end)
+    group.add_output_endpoint('output', output_end)
     server.run()

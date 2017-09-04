@@ -3,11 +3,11 @@ import json
 import time
 import asyncio
 import pipeflow
-from error import RequestError
+from error import RequestError, CaptchaError
 from util.log import logger
-from util.chrequest import get_page_handle, change_ip
-#from util.prrequest import get_page_handle
+from util.prrequest import get_page_handle
 from .spiders.dispatch import get_spider_by_platform
+from util.task_protocal import TaskProtocal
 
 
 MAX_WORKERS = 2
@@ -28,6 +28,7 @@ async def handle_worker(group, task):
             {
                 "platform": "amazon_us",
                 "url": "https://www.amazon.de/gp/bestsellers",
+                "date": "2017-08-08"
             }
     [output] result data format:
         JSON:
@@ -35,8 +36,10 @@ async def handle_worker(group, task):
                 "platform": "amazon_us"
                 "asin": "xxxx"
                 "extra": {
-                    "bs_cate": [item["cate"]],
-                    "date": "xxxx-xx-xx"
+                    "bsr": {
+                        "bs_cate": [item["cate"]],
+                        "date": "xxxx-xx-xx"
+                    }
                 }
             }
     """
@@ -44,8 +47,9 @@ async def handle_worker(group, task):
     global task_count
     global category_id_set
     global asin_set
-    task_dct = json.loads(task.get_data().decode('utf-8'))
 
+    tp = TaskProtocal(task)
+    task_dct = tp.get_data()
     try:
         task_count -= 1
         handle_cls = get_spider_by_platform(task_dct['platform'])
@@ -54,9 +58,13 @@ async def handle_worker(group, task):
         try:
             handle = await get_page_handle(handle_cls, url, timeout=60)
         except RequestError:
-            task.set_to('inner_output')
+            tp.set_to('inner_output')
             task_count += 1
-            return task
+            return tp.to_task()
+        except CaptchaError:
+            tp.set_to('inner_output')
+            task_count += 1
+            return tp.to_task()
         except Exception as exc:
             exc_info = (type(exc), exc, exc.__traceback__)
             taks_info = ' '.join([task_dct['platform'], url])
@@ -90,18 +98,19 @@ async def handle_worker(group, task):
 
         task_ls = []
         for url in url_ls:
-            new_task = pipeflow.Task(json.dumps({'platform': task_dct['platform'],
-                                                 'url': url, 'date': task_dct['date']}).encode('utf-8'))
-            new_task.set_to('inner_output')
-            task_ls.append(new_task)
+            new_tp = tp.new_task({'platform': task_dct['platform'], 'url': url, 'date': task_dct['date']})
+            new_tp.set_to('inner_output')
+            task_ls.append(new_tp.to_task())
         task_count += len(url_ls)
         for item in asin_ls:
-            new_task = pipeflow.Task(json.dumps({'platform': task_dct['platform'],
-                                                 'asin': item['asin'],
-                                                 'extra': {'bs_cate': [item['cate']],
-                                                           'date': task_dct['date']}}).encode('utf-8'))
-            new_task.set_to('output')
-            task_ls.append(new_task)
+            new_tp = tp.new_task({'platform': task_dct['platform'],
+                                  'asin': item['asin'],
+                                  'extra': {
+                                      'bsr': {'bs_cate': [item['cate']], 'date': task_dct['date']}
+                                      }
+                                  })
+            new_tp.set_to('output')
+            task_ls.append(new_tp.to_task())
         return task_ls
     finally:
         if group.get_running_cnt() == 1 and task_count == 0:
@@ -132,23 +141,24 @@ async def handle_task(group, task):
 
     from_name = task.get_from()
     if from_name == 'input':
+        tp = TaskProtocal(task)
         if task_start:
-            task.set_to('input_back')
-            return task
+            tp.set_to('input_back')
+            return tp.to_task()
         else:
             group.suspend_endpoint('input')
             task_start = True
-            task_dct = json.loads(task.get_data().decode('utf-8'))
+            task_dct = tp.get_data()
             logger.info(task_dct['root_url'])
             filter_ls = [cate.lower() for cate in task_dct['category_filter']]
             task_dct['url'] = task_dct['root_url']
             task_dct['date'] = time.strftime("%Y-%m-%d", time.localtime())
             del task_dct['root_url']
             del task_dct['category_filter']
-            task.set_data(json.dumps(task_dct).encode('utf-8'))
-            task.set_to('inner_output')
+            new_tp = tp.new_task(task_dct)
+            new_tp.set_to('inner_output')
             task_count = 1
-            return task
+            return new_tp.to_task()
 
     if from_name == 'notify' and task_start:
         if task.get_data() == b'task done':
@@ -158,18 +168,17 @@ async def handle_task(group, task):
 
 
 def run():
-    bsr_end = pipeflow.RedisInputEndpoint('amz_bsr_product:input', host='192.168.0.10', port=6379, db=0, password=None)
-    back_end = pipeflow.RedisOutputEndpoint('amz_bsr_product:input', host='192.168.0.10', port=6379, db=0, password=None)
+    bsr_end = pipeflow.RedisInputEndpoint('amz_bsr:input', host='192.168.0.10', port=6379, db=0, password=None)
+    back_end = pipeflow.RedisOutputEndpoint('amz_bsr:input', host='192.168.0.10', port=6379, db=0, password=None)
+    product_end = pipeflow.RedisOutputEndpoint('amz_bsr:output', host='192.168.0.10', port=6379, db=0, password=None)
     queue = asyncio.Queue()
     notify_input_end = pipeflow.QueueInputEndpoint(queue)
     notify_output_end = pipeflow.QueueOutputEndpoint(queue)
-    product_end = pipeflow.RedisOutputEndpoint('amz_product:input:bsr', host='192.168.0.10', port=6379, db=0, password=None)
     queue = asyncio.LifoQueue()
     inner_input_end = pipeflow.QueueInputEndpoint(queue)
     inner_output_end = pipeflow.QueueOutputEndpoint(queue)
 
     server = pipeflow.Server()
-    server.add_worker(change_ip)
 
     task_group = server.add_group('task', 1)
     task_group.set_handle(handle_task)
