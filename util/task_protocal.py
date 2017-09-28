@@ -1,4 +1,5 @@
 import json
+import zlib
 from pipeflow import Task
 
 
@@ -6,7 +7,7 @@ class TaskProtocal:
     def __init__(self, task):
         assert isinstance(task, Task), "Task type error"
         self._task = task
-        self._data = json.loads(self._task.get_data().decode('utf-8'))
+        self._data = json.loads(zlib.decompress(self._task.get_data()).decode('utf-8'))
         assert 'i' in self._data and 'tid' in self._data, "Task Protocal illegal"
 
     def get_data(self):
@@ -30,7 +31,7 @@ class TaskProtocal:
             'i': self._data['i']+1 if next_step else self._data['i'],
             'data': data
         }
-        return TaskProtocal(Task(json.dumps(dct).encode('utf-8')))
+        return TaskProtocal(Task(zlib.compress(json.dumps(dct).encode('utf-8'))))
 
     def to_task(self):
         return self._task

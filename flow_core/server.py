@@ -70,12 +70,11 @@ def refresh_conf():
     task_conf_dct = redis_execute(redis_client.hgetall)(FLOW_TASK_CONF)
     task_conf_dct = dict([(k.decode('utf-8'), json.loads(v.decode('utf-8')))
                           for k,v in task_conf_dct.items()])
-    #node_conf_dct = redis_execute(redis_client.hgetall)(FLOW_NODE_CONF)
-    #node_conf_dct = dict([(k.decode('utf-8'), json.loads(v.decode('utf-8')))
-    #                      for k,v in node_conf_dct.items()])
-    flow_conf['task_conf'].clear()
+    node_conf_dct = redis_execute(redis_client.hgetall)(FLOW_NODE_CONF)
+    node_conf_dct = dict([(k.decode('utf-8'), json.loads(v.decode('utf-8')))
+                          for k,v in node_conf_dct.items()])
     flow_conf['task_conf'] = task_conf_dct
-    #flow_conf['node_conf'] = node_conf_dct
+    flow_conf['node_conf'] = node_conf_dct
 
 
 async def refresh_routine(server):

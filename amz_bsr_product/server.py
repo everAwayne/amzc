@@ -5,12 +5,12 @@ import asyncio
 import pipeflow
 from error import RequestError, CaptchaError
 from util.log import logger
-from util.prrequest import get_page_handle
+from util.prrequest import get_page
 from .spiders.dispatch import get_spider_by_platform
 from util.task_protocal import TaskProtocal
 
 
-MAX_WORKERS = 2
+MAX_WORKERS = 3
 
 
 filter_ls = []
@@ -56,7 +56,8 @@ async def handle_worker(group, task):
         url = task_dct['url']
         logger.info("%s" % (url,))
         try:
-            handle = await get_page_handle(handle_cls, url, timeout=60)
+            soup = await get_page(url, timeout=60)
+            handle = handle_cls(soup)
         except RequestError:
             tp.set_to('inner_output')
             task_count += 1

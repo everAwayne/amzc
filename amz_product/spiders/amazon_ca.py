@@ -9,20 +9,13 @@ from lxml import etree
 class AMZCAProductInfo:
     """Extract product info from page
     """
-    def __init__(self, html):
-        self.soup = etree.HTML(html, parser=etree.HTMLParser(encoding='utf-8'))
+    def __init__(self, soup):
+        self.soup = soup
 
     def is_product_page(self):
         """Determinate page is a product page or not
         """
         if self.soup.xpath("//div[@id='dp-container']"):
-            return True
-        return False
-
-    def is_captcha_page(self):
-        """Determinate the page is a captcha page or not
-        """
-        if self.soup.xpath('//*[contains(@action, "validateCaptcha")]'):
             return True
         return False
 

@@ -3,7 +3,7 @@ import subprocess
 import asyncio
 import aiohttp
 import concurrent.futures
-from error import RequestError
+from error import RequestError, StatusError
 from .headers import get_header
 from .log import logger
 
@@ -20,8 +20,13 @@ in_request = 0
 change_ip_cnt = 0
 
 
-async def get_page_handle(handle_cls, url, timeout=60):
-    """Get the page of url, and create a handle, then return it.
+def is_captcha_page(soup):
+    if soup.xpath('//*[contains(@action, "validateCaptcha")]'):
+        return True
+    return False
+
+async def get_page(url, timeout=60, encoding="utf-8"):
+    """Get the page of url, and create a soup, then return it.
 
     If the page is a captcha page, change ip and request again.
     """
@@ -50,6 +55,10 @@ async def get_page_handle(handle_cls, url, timeout=60):
                         html = await resp.read()
                         if resp.status != 200:
                             logger.error('[%d] %s' % (resp.status, url))
+                            raise StatusError(resp.status)
+                        soup = etree.HTML(html, parser=etree.HTMLParser(encoding=encoding))
+            except StatusError:
+                raise
             #except Exception as exc:
             except:
                 #exc_info = (type(exc), exc, exc.__traceback__)
@@ -58,16 +67,14 @@ async def get_page_handle(handle_cls, url, timeout=60):
                 #exc.__traceback__ = None
                 raise RequestError
 
-            handle = handle_cls(html)
-            is_captcha_page = handle.is_captcha_page()
-            if is_captcha_page:
+            if is_captcha_page(soup):
                 if event_wait+1 == in_request:
                     start_change_event.set()
                     start_change_event.clear()
                 event_wait += 1
                 await finish_change_event.wait()
             else:
-                return handle
+                return soup
     finally:
         in_request -= 1
         if event_wait > 0 and event_wait == in_request:

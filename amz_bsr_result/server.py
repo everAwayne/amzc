@@ -220,7 +220,8 @@ async def del_expire(server):
 def run():
     get_popt()
     input_end = pipeflow.RedisInputEndpoint('amz_bsr_result:input', host='192.168.0.10', port=6379, db=0, password=None)
-    output_end = pipeflow.RedisOutputEndpoint('amz_bsr_result:output', host='192.168.0.10', port=6379, db=0, password=None)
+    #output_end = pipeflow.RedisOutputEndpoint('amz_bsr_result:output', host='192.168.0.10', port=6379, db=0, password=None)
+    output_end = pipeflow.RedisOutputEndpoint('amz_product:output:bsr', host='192.168.0.10', port=6379, db=0, password=None)
 
     server = pipeflow.Server()
     server.add_worker(crontab)

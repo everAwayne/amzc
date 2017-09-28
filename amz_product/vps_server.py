@@ -52,18 +52,19 @@ async def handle_worker(group, task):
     handle_cls = get_spider_by_platform(task_dct['platform'])
     url = get_url_by_platform(task_dct['platform'], task_dct['asin'])
     try:
-        handle = await get_page_handle(handle_cls, url, timeout=70)
+        soup = await get_page(url, timeout=70)
+        handle = handle_cls(soup)
     except RequestError:
         if from_end == 'routine_input':
-            tp.set_to('routine_input')
+            tp.set_to('routine_input_back')
         elif from_end == 'input':
-            tp.set_to('input')
+            tp.set_to('input_back')
         return tp.to_task()
     except CaptchaError:
         if from_end == 'routine_input':
-            tp.set_to('routine_input')
+            tp.set_to('routine_input_back')
         elif from_end == 'input':
-            tp.set_to('input')
+            tp.set_to('input_back')
         return tp.to_task()
     except Exception as exc:
         exc_info = (type(exc), exc, exc.__traceback__)

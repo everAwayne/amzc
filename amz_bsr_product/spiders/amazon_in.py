@@ -7,20 +7,13 @@ class AMZINBSRCategoryInfo(object):
     """Extract next level category urls, untill each bottom level,
     and then extract all asins of current category.
     """
-    def __init__(self, html):
-        self.soup = etree.HTML(html, parser=etree.HTMLParser(encoding='utf-8'))
+    def __init__(self, soup):
+        self.soup = soup
 
     def is_bsr_page(self):
         """Determinate page is a product page or not
         """
         if self.soup.xpath("//ul[@id='zg_browseRoot']"):
-            return True
-        return False
-
-    def is_captcha_page(self):
-        """Determinate the page is a captcha page or not
-        """
-        if self.soup.xpath('//*[contains(@action, "validateCaptcha")]'):
             return True
         return False
 

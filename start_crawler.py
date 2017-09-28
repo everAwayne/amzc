@@ -5,7 +5,7 @@ import argparse
 from util import daemon
 
 
-CRAWLER_LS = ['bsr', 'proxy_product', 'vps_product', 'bsr_result', 'flow_core']
+CRAWLER_LS = ['bsr', 'proxy_product', 'vps_product', 'bsr_result', 'flow_core', 'review', 'qa']
 
 
 if __name__ == '__main__':
@@ -29,4 +29,8 @@ if __name__ == '__main__':
         from amz_product import vps_server as server
     elif args.crawler == 'flow_core':
         from flow_core import server
+    elif args.crawler == 'review':
+        from amz_review import server
+    elif args.crawler == 'qa':
+        from amz_qa import server
     server.run()
