@@ -1,5 +1,6 @@
 import json
 import zlib
+import copy
 from pipeflow import Task
 
 
@@ -11,7 +12,7 @@ class TaskProtocal:
         assert 'i' in self._data and 'tid' in self._data, "Task Protocal illegal"
 
     def get_data(self):
-        return self._data['data']
+        return copy.deepcopy(self._data['data'])
 
     def get_from(self):
         return self._task.get_from()
@@ -26,6 +27,10 @@ class TaskProtocal:
         return self._data['i']
 
     def new_task(self, data, next_step=False):
+        assert isinstance(data, dict), "data isn't a dict"
+        if 'extra' in self._data['data']:
+            dct = data.setdefault("extra", {})
+            dct.update(self._data['data']['extra'])
         dct = {
             'tid': self._data['tid'],
             'i': self._data['i']+1 if next_step else self._data['i'],

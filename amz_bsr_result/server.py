@@ -8,6 +8,7 @@ import functools
 import pipeflow
 from util.log import logger
 from util.task_protocal import TaskProtocal
+from util.rabbitmq_endpoints import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
 
 
 POPT_REDIS_CONF = {'host': '192.168.0.10', 'port': 6379, 'db': 10, 'password': None}
@@ -219,9 +220,9 @@ async def del_expire(server):
 
 def run():
     get_popt()
-    input_end = pipeflow.RedisInputEndpoint('amz_bsr_result:input', host='192.168.0.10', port=6379, db=0, password=None)
-    #output_end = pipeflow.RedisOutputEndpoint('amz_bsr_result:output', host='192.168.0.10', port=6379, db=0, password=None)
-    output_end = pipeflow.RedisOutputEndpoint('amz_product:output:bsr', host='192.168.0.10', port=6379, db=0, password=None)
+    input_end = RabbitmqInputEndpoint('amz_bsr_result:input', host='192.168.0.10', port=5672,
+            virtualhost="/", heartbeat_interval=120, login='guest', password='guest')
+    output_end = pipeflow.RedisOutputEndpoint('amz_product:output:bsr', host='192.168.0.10', port=6379, db=5, password=None)
 
     server = pipeflow.Server()
     server.add_worker(crontab)

@@ -5,7 +5,8 @@ import argparse
 from util import daemon
 
 
-CRAWLER_LS = ['bsr', 'proxy_product', 'vps_product', 'bsr_result', 'flow_core', 'review', 'qa']
+CRAWLER_LS = ['flow_core', 'callback',
+              'bsr', 'proxy_product', 'vps_product', 'bsr_result', 'review', 'qa']
 
 
 if __name__ == '__main__':
@@ -33,4 +34,6 @@ if __name__ == '__main__':
         from amz_review import server
     elif args.crawler == 'qa':
         from amz_qa import server
+    elif args.crawler == 'callback':
+        from http_callback import server
     server.run()

@@ -8,6 +8,7 @@ from util.log import logger
 from util.prrequest import get_page
 from .spiders.dispatch import get_spider_by_platform
 from util.task_protocal import TaskProtocal
+from util.rabbitmq_endpoints import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
 
 
 MAX_WORKERS = 3
@@ -169,9 +170,12 @@ async def handle_task(group, task):
 
 
 def run():
-    bsr_end = pipeflow.RedisInputEndpoint('amz_bsr:input', host='192.168.0.10', port=6379, db=0, password=None)
-    back_end = pipeflow.RedisOutputEndpoint('amz_bsr:input', host='192.168.0.10', port=6379, db=0, password=None)
-    product_end = pipeflow.RedisOutputEndpoint('amz_bsr:output', host='192.168.0.10', port=6379, db=0, password=None)
+    bsr_end = RabbitmqInputEndpoint('amz_bsr:input', host='192.168.0.10', port=5672,
+            virtualhost="/", heartbeat_interval=120, login='guest', password='guest')
+    back_end = RabbitmqOutputEndpoint('amz_bsr:input', host='192.168.0.10', port=5672,
+            virtualhost="/", heartbeat_interval=120, login='guest', password='guest')
+    product_end = RabbitmqOutputEndpoint('amz_bsr:output', host='192.168.0.10', port=5672,
+            virtualhost="/", heartbeat_interval=120, login='guest', password='guest')
     queue = asyncio.Queue()
     notify_input_end = pipeflow.QueueInputEndpoint(queue)
     notify_output_end = pipeflow.QueueOutputEndpoint(queue)

@@ -8,6 +8,7 @@ from util.log import logger
 from util.prrequest import get_page
 from .spiders.dispatch import get_spider_by_platform, get_url_by_platform
 from util.task_protocal import TaskProtocal
+from util.rabbitmq_endpoints import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
 
 
 MAX_WORKERS = 3
@@ -103,8 +104,6 @@ async def handle_worker(group, task):
             'platform': task_dct['platform'], 'asin': task_dct['asin'],
             'qas': qa_ls
         }
-        if task_dct.get('extra'):
-            info['extra'] = task_dct['extra']
         new_tp = tp.new_task(info)
         new_tp.set_to('output')
         task_ls.append(new_tp.to_task())
@@ -153,9 +152,12 @@ async def handle_task(group, task):
 
 
 def run():
-    input_end = pipeflow.RedisInputEndpoint('amz_qa:input', host='192.168.0.10', port=6379, db=0, password=None)
-    back_end = pipeflow.RedisOutputEndpoint('amz_qa:input', host='192.168.0.10', port=6379, db=0, password=None)
-    output_end = pipeflow.RedisOutputEndpoint('amz_qa:output', host='192.168.0.10', port=6379, db=0, password=None)
+    input_end = RabbitmqInputEndpoint('amz_qa:input', host='192.168.0.10', port=5672,
+            virtualhost="/", heartbeat_interval=120, login='guest', password='guest')
+    back_end = RabbitmqOutputEndpoint('amz_qa:input', host='192.168.0.10', port=5672,
+            virtualhost="/", heartbeat_interval=120, login='guest', password='guest')
+    output_end = RabbitmqOutputEndpoint('amz_qa:output', host='192.168.0.10', port=5672,
+            virtualhost="/", heartbeat_interval=120, login='guest', password='guest')
     queue = asyncio.Queue()
     notify_input_end = pipeflow.QueueInputEndpoint(queue)
     notify_output_end = pipeflow.QueueOutputEndpoint(queue)
