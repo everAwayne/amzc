@@ -23,6 +23,7 @@ class AMZJPProductInfo:
         """Pack product info
         """
         is_fba = self.is_fba()
+        p_asin_info = self.get_parent_asin()
         title_info = self.get_title()
         brand_info = self.get_brand()
         price_info = self.get_price()
@@ -34,6 +35,7 @@ class AMZJPProductInfo:
 
         return {
             'fba': 1 if is_fba else 0,
+            'parent_asin': p_asin_info['asin'],
             'title': title_info['title'],
             'brand': brand_info['brand'],
             'price': price_info['price'],
@@ -47,6 +49,13 @@ class AMZJPProductInfo:
             'detail_info': bsr_info,
             'relative_info': relative_info,
             }
+
+    def get_parent_asin(self):
+        """Extract parent asin
+        """
+        asin_ls = self.soup.xpath("//span[@id='twisterNonJsData']/input[@name='ASIN']/@value")
+        return {'asin': asin_ls[0] if asin_ls else ''}
+
 
     def get_title(self):
         """Extract title info
