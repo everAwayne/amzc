@@ -30,7 +30,8 @@ class AMZCAProductInfo:
         img_info = self.get_img_info()
         review_info = self.get_review()
         merchant_info = self.get_merchants_info()
-        bsr_info = self.get_bsr_info()
+        product_info = self.get_product_info()
+        relative_info = self.get_relative_asin()
 
         return {
             'fba': 1 if is_fba else 0,
@@ -43,9 +44,11 @@ class AMZCAProductInfo:
             #'imgs': img_info['imgs'],
             'review': review_info['review_score'],
             'review_count': review_info['review_num'],
+            'review_statistics': review_info['review_statistics'],
             'merchant': merchant_info['merchant'],
             'merchant_id': merchant_info['merchant_id'],
-            'detail_info': bsr_info,
+            'detail_info': product_info['bsr_info'],
+            'product_info': product_info['product_info'],
             'relative_info': relative_info,
             }
 
@@ -108,8 +111,19 @@ class AMZCAProductInfo:
         review_num = 0
         if review_num_ls:
             review_num = int(review_num_ls[0].replace(',',''))
+        review_statistics = {1:0,2:0,3:0,4:0,5:0}
+        tr_ls = self.soup.xpath("//table[@id='histogramTable']//tr[@class='a-histogram-row']")
+        for tr in tr_ls:
+            text = ''.join(tr.xpath("./td[1]/a/text()"))
+            reg_res = re.search(r"(\d+)", text)
+            star = int(reg_res.group(1)) if reg_res else None
+            text = ''.join(tr.xpath("./td[2]//div[@aria-label]/@aria-label"))
+            reg_res = re.search(r"(\d+)", text)
+            prc = int(reg_res.group(1)) if reg_res else None
+            if star is not None and prc is not None:
+                review_statistics[star] = prc
 
-        return {'review_score': review_score, 'review_num': review_num}
+        return {'review_score': review_score, 'review_num': review_num, 'review_statistics': review_statistics}
 
 
     def is_fba(self):
@@ -162,26 +176,52 @@ class AMZCAProductInfo:
         return {"merchant": merchant, "merchant_id": merchant_id}
 
 
-    def get_bsr_info(self):
-        """Extract bsr info
+    def get_product_info(self):
+        """Extract product info
         """
-        bsr_dct = {}
+        bsr_dct = {
+            'cat_1_rank': None,
+            'cat_1_name': None,
+            'cat_ls': [],
+        }
+        product_info_dct = {
+            'product_dimensions': None,
+            'shipping_weight': None,
+            'date_first_available': None,
+        }
         div1 = self.soup.xpath("//*[@id='detail-bullets' or @id='detail_bullets_id']")
         div2 = self.soup.xpath("//*[@id='detailBullets']")
         tr_ls1 = self.soup.xpath("//div[@id='prodDetails']//div[@class='pdTab']//table//tr")
         tr_ls2 = self.soup.xpath("//div[@id='prodDetails']//table[@role='presentation']//tr")
         if div1:
             div = div1[0]
+            li_ls = div.xpath(".//div[@class='content']/ul/li[@id='SalesRank']")
+            if li_ls:
+                li = li_ls[0]
+                text = ' '.join(li.xpath("./text()")).strip()
+                reg_res = re.search(r'#([\d,]+)\s+in\s+(.+)\(', text)
+                if reg_res:
+                    rank = int(reg_res.group(1).replace(',', ''))
+                    name = reg_res.group(2).strip()
+                    bsr_dct['cat_1_rank'] = rank
+                    bsr_dct['cat_1_name'] = name
+                cat_li_ls = li.xpath("./ul[@class='zg_hrsr']/li[@class='zg_hrsr_item']")
+                for li in cat_li_ls:
+                    reg_res = re.search(r'([\d,]+)',''.join(li.xpath("./span[@class='zg_hrsr_rank']/text()")))
+                    rank = int(reg_res.group(1).replace(',', '').strip()) if reg_res else None
+                    name_ls = li.xpath("./span[@class='zg_hrsr_ladder']//a/text()")
+                    bsr_dct['cat_ls'].append({"rank": rank, "name_ls": name_ls})
+
             li_ls = div.xpath(".//div[@class='content']/ul/li")
             for li in li_ls:
-                if 'SalesRank' in li.xpath("./@id"):
-                    text = ' '.join(li.xpath("./text()")).strip()
-                    reg_res = re.search(r'#([\d,]+)\s+in\s+(.+)\(', text)
-                    if reg_res:
-                        rank = int(reg_res.group(1).replace(',', ''))
-                        name = reg_res.group(2).strip()
-                        bsr_dct['cat_1_rank'] = rank
-                        bsr_dct['cat_1_name'] = name
+                name = ''.join(li.xpath("./b/text()")).replace(":", "").strip().lower()
+                text = ''.join(li.xpath("./text()")).strip()
+                if 'product dimensions' == name:
+                    product_info_dct['product_dimensions'] = text
+                elif 'shipping weight' == name:
+                    product_info_dct['shipping_weight'] = text
+                elif 'date first available' in name:
+                    product_info_dct['date_first_available'] = text
         elif div2:
             div = div2[0]
             li_ls = div.xpath(".//li[@id='SalesRank']")
@@ -194,6 +234,23 @@ class AMZCAProductInfo:
                     name = reg_res.group(2).strip()
                     bsr_dct['cat_1_rank'] = rank
                     bsr_dct['cat_1_name'] = name
+                cat_li_ls = li.xpath("./ul[@class='zg_hrsr']/li[@class='zg_hrsr_item']")
+                for li in cat_li_ls:
+                    reg_res = re.search(r'([\d,]+)',''.join(li.xpath("./span[@class='zg_hrsr_rank']/text()")))
+                    rank = int(reg_res.group(1).replace(',', '').strip()) if reg_res else None
+                    name_ls = li.xpath("./span[@class='zg_hrsr_ladder']//a/text()")
+                    bsr_dct['cat_ls'].append({"rank": rank, "name_ls": name_ls})
+
+            span_ls = div.xpath(".//div[@id='detailBullets_feature_div']/ul/li/span")
+            for span in span_ls:
+                name = ''.join(span.xpath("./span[1]/text()")).replace(":", "").strip().lower()
+                text = ''.join(span.xpath("./span[2]/text()")).strip()
+                if 'product dimensions' == name:
+                    product_info_dct['product_dimensions'] = text
+                elif 'shipping weight' == name:
+                    product_info_dct['shipping_weight'] = text
+                elif 'date first available' in name:
+                    product_info_dct['date_first_available'] = text
         elif tr_ls1:
             for tr in tr_ls1:
                 k_ls = tr.xpath("./td[@class='label']/text()")
@@ -207,23 +264,54 @@ class AMZCAProductInfo:
                         name = reg_res.group(2).strip()
                         bsr_dct['cat_1_rank'] = rank
                         bsr_dct['cat_1_name'] = name
+                    cat_li_ls = tr.xpath("./td[@class='value']/ul[@class='zg_hrsr']/li[@class='zg_hrsr_item']")
+                    for li in cat_li_ls:
+                        reg_res = re.search(r'([\d,]+)',''.join(li.xpath("./span[@class='zg_hrsr_rank']/text()")))
+                        rank = int(reg_res.group(1).replace(',', '').strip()) if reg_res else None
+                        name_ls = li.xpath("./span[@class='zg_hrsr_ladder']//a/text()")
+                        bsr_dct['cat_ls'].append({"rank": rank, "name_ls": name_ls})
+                else:
+                    name = ''.join(tr.xpath("./td[@class='label']/text()")).replace(":", "").strip().lower()
+                    text = ''.join(tr.xpath("./td[@class='value']/text()")).strip()
+                    if 'product dimensions' == name:
+                        product_info_dct['product_dimensions'] = text
+                    elif 'shipping weight' == name:
+                        product_info_dct['shipping_weight'] = text
+                    elif 'date first available' in name:
+                        product_info_dct['date_first_available'] = text
         elif tr_ls2:
             for tr in tr_ls2:
                 k_ls = tr.xpath("./th/text()")
                 if not k_ls:
                     continue
-                k = k_ls[0].strip().strip(":").lower()
+                k = k_ls[0].replace(":", "").strip().lower()
                 if 'best sellers rank' in k:
                     span_ls = tr.xpath("./td/span/span")
-                    for span in span_ls:
-                        text = span.xpath("./text()")[0]
+                    if len(span_ls):
+                        text = span_ls[0].xpath("./text()")[0]
                         reg_res = re.search(r'#([\d,]+)\s+in\s+(.+)\(', text)
                         if reg_res:
                             rank = int(reg_res.group(1).replace(',', ''))
                             name = reg_res.group(2).strip()
                             bsr_dct['cat_1_rank'] = rank
                             bsr_dct['cat_1_name'] = name
-        return bsr_dct
+                    span_ls = span_ls[1:]
+                    for span in span_ls:
+                        text = ' '.join(span.xpath("./text()")).strip()
+                        reg_res = re.search(r'([\d,]+)', text)
+                        rank = int(reg_res.group(1).replace(',', '').strip()) if reg_res else None
+                        name_ls = span.xpath(".//a/text()")
+                        bsr_dct['cat_ls'].append({"rank": rank, "name_ls": name_ls})
+                else:
+                    name = k
+                    text = ''.join(tr.xpath("./td/text()")).strip()
+                    if 'product dimensions' == name:
+                        product_info_dct['product_dimensions'] = text
+                    elif 'shipping weight' == name:
+                        product_info_dct['shipping_weight'] = text
+                    elif 'date first available' in name:
+                        product_info_dct['date_first_available'] = text
+        return {"bsr_info": bsr_dct, "product_info": product_info_dct}
 
 
     def get_relative_asin(self):

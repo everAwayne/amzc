@@ -6,7 +6,7 @@ import random
 import functools
 import threading
 
-CONF_HOST = "192.168.0.10
+CONF_HOST = "192.168.0.10"
 CONF_PORT = 6379
 CONF_DB = 10
 CONF_PASSWD = None
@@ -40,7 +40,7 @@ class FlowInput(object):
             credentials = pika.PlainCredentials(self.rabbitmq_conf_dct['authc']['account'],
                                                 self.rabbitmq_conf_dct['authc']['password'])
             parameters = pika.ConnectionParameters(host=addr['ip'], port=addr['port'],
-                    virtual_host="/", heartbeat_interval=120, credentials=credentials)
+                    virtual_host="/", heartbeat_interval=0, credentials=credentials)
             self._local.parameters = parameters
             self._local.connection = pika.BlockingConnection(parameters)
             self._local.channel = self._local.connection.channel()
@@ -82,10 +82,12 @@ class FlowInput(object):
                 return self._local.channel.basic_publish(exchange='', routing_key=queue_name,
                                             body=zlib.compress(json.dumps(dct)))
             except (pika.exceptions.ChannelClosed, pika.exceptions.ConnectionClosed):
+                print "[flow input]=====connection closed====="
                 self._local.connection.close()
                 try:
                     self._local.connection = pika.BlockingConnection(self._local.parameters)
                     self._local.channel = connection.channel()
                 except:
+                    print "[flow input]=====reconnect error====="
                     pass
         return False

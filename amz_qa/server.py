@@ -11,7 +11,7 @@ from util.task_protocal import TaskProtocal
 from util.rabbitmq_endpoints import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
 
 
-MAX_WORKERS = 3
+MAX_WORKERS = 30
 
 task_count = 0
 
@@ -30,18 +30,17 @@ async def handle_worker(group, task):
     [output] result data format:
         JSON:
             {
-                "platform": "amazon_us"
-                "asin": "xxxx"
+                "platform": "amazon_us",
+                "asin": "xxxx",
+                "end": true,
                 "qas": [
                     {
-                        "qa_id": "xdf",
-                        "rating": 4.0,
-                        "title": "title",
-                        "content": "content",
-                        "author": "author",
-                        "author_id": "author_id",
-                        "date": "2017-09-09",
-                        "verified_purchase": False,
+                        'qa_id': 'xdf',
+                        'vote': 5,
+                        'question': 'qqq',
+                        'answer': 'aaa',
+                        'author': 'author',
+                        'date': '2017-09-09',
                     }
                 ]
             }
@@ -51,7 +50,6 @@ async def handle_worker(group, task):
     task_dct = tp.get_data()
     handle_cls = get_spider_by_platform(task_dct['platform'])
     url = get_url_by_platform(task_dct['platform'], task_dct['asin'], task_dct['page'])
-    logger.info("%s" % url)
     try:
         soup = await get_page(url, timeout=60)
         handle = handle_cls(soup)
@@ -88,7 +86,6 @@ async def handle_worker(group, task):
         i = qa_id_ls.index(task_dct['till'])
         qa_ls = qa_ls[:i]
 
-    print(next_page, qa_ls)
     task_ls = []
     if next_page:
         task_dct['page'] = next_page
@@ -104,6 +101,8 @@ async def handle_worker(group, task):
             'platform': task_dct['platform'], 'asin': task_dct['asin'],
             'qas': qa_ls
         }
+        if not next_page:
+            info['end'] = True
         new_tp = tp.new_task(info)
         new_tp.set_to('output')
         task_ls.append(new_tp.to_task())

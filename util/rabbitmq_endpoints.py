@@ -16,32 +16,32 @@ class RabbitMQClient:
 class RabbitmqInputEndpoint(RabbitMQClient, AbstractCoroutineInputEndpoint):
     """Rabbitmq aio input endpoint"""
 
-    def __init__(self, queue_name, **conf):
+    def __init__(self, queue_name, loop=None, **conf):
+        self._loop = loop
+        if self._loop is None:
+            self._loop = asyncio.get_event_loop()
         if queue_name is None:
             raise ValueError("queue_name must be not None")
         self._queue_name = queue_name
-        self._init = False
         self._inner_q = asyncio.Queue(1)
         super(RabbitmqInputEndpoint, self).__init__(**conf)
+        self._loop.run_until_complete(self.initialize())
 
     async def initialize(self):
-        if not self._init:
-            while True:
-                try:
-                    self._connection = await aio_pika.connect_robust(**self._conf)
-                    self._channel = await self._connection.channel()
-                    await self._channel.set_qos(prefetch_count=1)
-                    self._queue = await self._channel.declare_queue(self._queue_name, durable=True)
-                except Exception as exc:
-                    logger.error("Connect error")
-                    logger.error(exc)
-                else:
-                    await self._queue.consume(self._callback)
-                    self._init = True
-                    break
+        while True:
+            try:
+                self._connection = await aio_pika.connect_robust(**self._conf)
+                self._channel = await self._connection.channel()
+                await self._channel.set_qos(prefetch_count=1)
+                self._queue = await self._channel.declare_queue(self._queue_name, durable=True)
+            except Exception as exc:
+                logger.error("Connect error")
+                logger.error(exc)
+            else:
+                await self._queue.consume(self._callback)
+                break
 
     async def get(self):
-        await self.initialize()
         message = await self._inner_q.get()
         task = Task(message.body)
         return task
@@ -54,30 +54,30 @@ class RabbitmqInputEndpoint(RabbitMQClient, AbstractCoroutineInputEndpoint):
 class RabbitmqOutputEndpoint(RabbitMQClient, AbstractCoroutineOutputEndpoint):
     """Rabbitmq aio output endpoint"""
 
-    def __init__(self, queue_name, persistent=False, **conf):
+    def __init__(self, queue_name, persistent=False, loop=None, **conf):
+        self._loop = loop
+        if self._loop is None:
+            self._loop = asyncio.get_event_loop()
         if queue_name is None:
             raise ValueError("queue_name must be not None")
         self._queue_name = queue_name
-        self._init = False
         self._persistent = persistent
         super(RabbitmqOutputEndpoint, self).__init__(**conf)
+        self._loop.run_until_complete(self.initialize())
 
     async def initialize(self):
-        if not self._init:
-            while True:
-                try:
-                    self._connection = await aio_pika.connect_robust(**self._conf)
-                    self._channel = await self._connection.channel()
-                    self._queue = await self._channel.declare_queue(self._queue_name, durable=True)
-                except Exception as exc:
-                    logger.error("Connect error")
-                    logger.error(exc)
-                else:
-                    self._init = True
-                    break
+        while True:
+            try:
+                self._connection = await aio_pika.connect_robust(**self._conf)
+                self._channel = await self._connection.channel()
+                self._queue = await self._channel.declare_queue(self._queue_name, durable=True)
+            except Exception as exc:
+                logger.error("Connect error")
+                logger.error(exc)
+            else:
+                break
 
     async def put(self, tasks):
-        await self.initialize()
         msgs = []
         for task in tasks:
             msgs.append(task.get_data())
