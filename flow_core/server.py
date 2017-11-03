@@ -46,7 +46,7 @@ def handle_worker(group, task):
     endpoint_name = flow_conf[FLOW_TASK_CONF][tid][step+1]
     next_tp = tp.new_task(tp.get_data(), next_step=True)
     next_tp.set_to(endpoint_name)
-    return next_tp.to_task()
+    return next_tp
 
 
 def redis_execute(func):

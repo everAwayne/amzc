@@ -80,7 +80,7 @@ class RabbitmqOutputEndpoint(RabbitMQClient, AbstractCoroutineOutputEndpoint):
     async def put(self, tasks):
         msgs = []
         for task in tasks:
-            msgs.append(task.get_data())
+            msgs.append(task.get_raw_data())
         await self._put(self._queue_name, msgs)
         return True
 

@@ -57,10 +57,10 @@ async def handle_worker(group, task):
         handle = handle_cls(soup)
     except RequestError:
         tp.set_to('inner_output')
-        return tp.to_task()
+        return tp
     except CaptchaError:
         tp.set_to('inner_output')
-        return tp.to_task()
+        return tp
     except Exception as exc:
         exc_info = (type(exc), exc, exc.__traceback__)
         taks_info = ' '.join([task_dct['platform'], url])
@@ -93,7 +93,7 @@ async def handle_worker(group, task):
         task_dct['page'] = next_page
         new_tp = tp.new_task(task_dct)
         new_tp.set_to('inner_output')
-        task_ls.append(new_tp.to_task())
+        task_ls.append(new_tp)
     else:
         new_task = pipeflow.Task(b'task done')
         new_task.set_to('notify')
@@ -107,7 +107,7 @@ async def handle_worker(group, task):
             info['end'] = True
         new_tp = tp.new_task(info)
         new_tp.set_to('output')
-        task_ls.append(new_tp.to_task())
+        task_ls.append(new_tp)
     return task_ls
 
 
@@ -132,7 +132,7 @@ async def handle_task(group, task):
         tp = TaskProtocal(task)
         if task_count >= MAX_WORKERS:
             tp.set_to('input_back')
-            return tp.to_task()
+            return tp
         else:
             task_count += 1
             if task_count >= MAX_WORKERS:
@@ -143,7 +143,7 @@ async def handle_task(group, task):
             task_dct["page"] = 1
             new_tp = tp.new_task(task_dct)
             new_tp.set_to('inner_output')
-            return new_tp.to_task()
+            return new_tp
 
     if from_name == 'notify' and task_count:
         if task.get_data() == b'task done':
@@ -155,7 +155,7 @@ async def handle_task(group, task):
 def run():
     input_end = RabbitmqInputEndpoint('amz_review:input', host='192.168.0.10', port=5672,
             virtualhost="/", heartbeat_interval=120, login='guest', password='guest')
-    back_end = RabbitmqOutputEndpoint('amz_review:input',host='192.168.0.10', port=5672,
+    back_end = RabbitmqOutputEndpoint('amz_review:input', host='192.168.0.10', port=5672,
             virtualhost="/", heartbeat_interval=120, login='guest', password='guest')
     output_end = RabbitmqOutputEndpoint('amz_review:output', host='192.168.0.10', port=5672,
             virtualhost="/", heartbeat_interval=120, login='guest', password='guest')
@@ -168,7 +168,7 @@ def run():
 
     server = pipeflow.Server()
 
-    task_group = server.add_group('task', MAX_WORKERS)
+    task_group = server.add_group('task', 1)
     task_group.set_handle(handle_task)
     task_group.add_input_endpoint('input', input_end)
     task_group.add_input_endpoint('notify', notify_input_end)

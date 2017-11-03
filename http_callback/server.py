@@ -15,7 +15,6 @@ async def handle_worker(group, task):
     """Handle callback task
     """
     tp = TaskProtocal(task)
-    logger.info(tp.get_data())
     task_dct = tp.get_data()
     if 'extra' in task_dct and 'cb' in task_dct['extra']:
         url = task_dct['extra']['cb'].get('url')

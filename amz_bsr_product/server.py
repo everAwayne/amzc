@@ -12,6 +12,7 @@ from util.rabbitmq_endpoints import RabbitmqInputEndpoint, RabbitmqOutputEndpoin
 
 
 MAX_WORKERS = 3
+PLATFORM_FILTER_LS = ["amazon_us"]
 
 
 filter_ls = []
@@ -62,11 +63,11 @@ async def handle_worker(group, task):
         except RequestError:
             tp.set_to('inner_output')
             task_count += 1
-            return tp.to_task()
+            return tp
         except CaptchaError:
             tp.set_to('inner_output')
             task_count += 1
-            return tp.to_task()
+            return tp
         except Exception as exc:
             exc_info = (type(exc), exc, exc.__traceback__)
             taks_info = ' '.join([task_dct['platform'], url])
@@ -102,7 +103,7 @@ async def handle_worker(group, task):
         for url in url_ls:
             new_tp = tp.new_task({'platform': task_dct['platform'], 'url': url, 'date': task_dct['date']})
             new_tp.set_to('inner_output')
-            task_ls.append(new_tp.to_task())
+            task_ls.append(new_tp)
         task_count += len(url_ls)
         for item in asin_ls:
             new_tp = tp.new_task({'platform': task_dct['platform'],
@@ -112,7 +113,7 @@ async def handle_worker(group, task):
                                       }
                                   })
             new_tp.set_to('output')
-            task_ls.append(new_tp.to_task())
+            task_ls.append(new_tp)
         return task_ls
     finally:
         if group.get_running_cnt() == 1 and task_count == 0:
@@ -144,13 +145,15 @@ async def handle_task(group, task):
     from_name = task.get_from()
     if from_name == 'input':
         tp = TaskProtocal(task)
+        task_dct = tp.get_data()
+        if task_dct['platform'] not in PLATFORM_FILTER_LS:
+            return
         if task_start:
             tp.set_to('input_back')
-            return tp.to_task()
+            return tp
         else:
             group.suspend_endpoint('input')
             task_start = True
-            task_dct = tp.get_data()
             logger.info(task_dct['root_url'])
             filter_ls = [cate.lower() for cate in task_dct['category_filter']]
             task_dct['url'] = task_dct['root_url']
@@ -160,7 +163,7 @@ async def handle_task(group, task):
             new_tp = tp.new_task(task_dct)
             new_tp.set_to('inner_output')
             task_count = 1
-            return new_tp.to_task()
+            return new_tp
 
     if from_name == 'notify' and task_start:
         if task.get_data() == b'task done':
