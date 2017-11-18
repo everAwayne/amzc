@@ -319,7 +319,18 @@ class AMZFRProductInfo:
         """
         ls_1 = self.soup.xpath("//div[@id='sims-fbt-content']//input[contains(@name, 'discoveredAsins')]/@value")
         ls_2 = self.soup.xpath("//div[@id='purchase-sims-feature']//div[@data-a-carousel-options]/@data-a-carousel-options")
+        ls_3 = self.soup.xpath("//div[@id='session-sims-feature']//div[@data-a-carousel-options]/@data-a-carousel-options")
+        ls_4 = self.soup.xpath("//div[@id='recommendations']/ul/li/span/div[1]/a/@href")
         if ls_2:
             ls_2 = json.loads(ls_2[0])['ajax']['id_list']
+        if ls_3:
+            ls_3 = json.loads(ls_3[0])['ajax']['id_list']
+        if ls_4:
+            ls = []
+            for item in ls_4:
+                reg_ret = re.search(r'/dp/([^/]+)/', item)
+                ls.append(reg_ret.group(1))
+            ls_4 = ls
 
-        return {'bought_together': ls_1, 'also_bought': ls_2}
+        return {'bought_together': ls_1, 'also_bought': ls_2, 'also_viewed': ls_3,
+                'viewed_also_bought': ls_4}

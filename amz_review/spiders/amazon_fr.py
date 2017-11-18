@@ -34,22 +34,32 @@ class AMZFRReviewInfo(object):
     def get_info(self):
         """Pack review info
         """
-        next_page = self.get_next_page()
+        page_info = self.get_page_info()
         review_ls = self.get_review_ls()
-        return next_page, review_ls
+        return page_info, review_ls
 
-    def get_next_page(self):
+    def get_page_info(self):
+        info = {
+            "cur_page": 1,
+            "cur_page_url": None,
+            "next_page_url": None,
+        }
         btn_ls = self.soup.xpath("//div[@id='cm_cr-pagination_bar']//li[@data-reftag='cm_cr_arp_d_paging_btm']")
-        selected_index = 0
+        selected_index = None
         for i in range(len(btn_ls)):
             if 'a-selected' in ' '.join(btn_ls[i].xpath("./@class")):
                 selected_index = i
                 break
-        if selected_index+1 < len(btn_ls):
-            page = btn_ls[selected_index+1].xpath("./a/text()")
+        if selected_index is not None:
+            page = btn_ls[selected_index].xpath("./a/text()")
+            url = ''.join(btn_ls[selected_index].xpath("./a/@href"))
             if page:
-                return int(page[0])
-        return None
+                info['cur_page'] = int(page[0])
+            info['cur_page_url'] = url
+            if selected_index+1 < len(btn_ls):
+                url = ''.join(btn_ls[selected_index+1].xpath("./a/@href"))
+                info['next_page_url'] = url
+        return info
 
     def month_translate(self, date):
         for m in MONTH_MAP:
