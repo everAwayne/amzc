@@ -3,10 +3,11 @@ import json
 import time
 import asyncio
 import pipeflow
+from urllib import parse
 from error import RequestError, CaptchaError
 from util.log import logger
 from util.prrequest import get_page
-from .spiders.dispatch import get_spider_by_platform, get_url_by_platform
+from .spiders.dispatch import get_spider_by_platform, get_url_by_platform, formalize_url
 from util.task_protocal import TaskProtocal
 from util.rabbitmq_endpoints import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
 
@@ -25,13 +26,14 @@ async def handle_worker(group, task):
                 "platform": "amazon_us",
                 "asin": "xxxx",
                 "till": "reveiw id",
-                "page": 1,
+                "url": "xxxx",
             }
     [output] result data format:
         JSON:
             {
                 "platform": "amazon_us",
                 "asin": "xxxx",
+                "page": 1,
                 "end": true,
                 "reviews": [
                     {
@@ -51,7 +53,11 @@ async def handle_worker(group, task):
     tp = TaskProtocal(task)
     task_dct = tp.get_data()
     handle_cls = get_spider_by_platform(task_dct['platform'])
-    url = get_url_by_platform(task_dct['platform'], task_dct['asin'], task_dct['page'])
+    notify_task = pipeflow.Task(b'task done')
+    notify_task.set_to('notify')
+    url = task_dct['url']
+    if not url:
+        url = get_url_by_platform(task_dct['platform'], task_dct['asin'])
     try:
         soup = await get_page(url, timeout=60)
         handle = handle_cls(soup)
@@ -66,44 +72,56 @@ async def handle_worker(group, task):
         taks_info = ' '.join([task_dct['platform'], url])
         logger.error('Get page handle error\n'+taks_info, exc_info=exc_info)
         exc.__traceback__ = None
-        return
+        return notify_task
 
     is_review_page = handle.is_review_page()
     # abandon result
     if not is_review_page:
-        return
+        return notify_task
 
     try:
-        next_page, review_ls = handle.get_info()
+        page_info, review_ls = handle.get_info()
     except Exception as exc:
         exc_info = (type(exc), exc, exc.__traceback__)
         taks_info = ' '.join([task_dct['platform'], url])
         logger.error('Get page info error\n'+taks_info, exc_info=exc_info)
         exc.__traceback__ = None
-        return
+        return notify_task
 
+    ### just for redirect response situation
+    if page_info['cur_page_url']:
+        pr = parse.urlparse(page_info['cur_page_url'])
+        query_dct = dict(parse.parse_qsl(pr.query))
+        if 'reviewerType' not in query_dct or 'pageSize' not in query_dct or 'sortBy' not in query_dct:
+            new_url = get_url_by_platform(task_dct['platform'], task_dct['asin'], pr.path)
+            task_dct['url'] = new_url
+            new_tp = tp.new_task(task_dct)
+            new_tp.set_to('inner_output')
+            return new_tp
+
+    if page_info['next_page_url']:
+        page_info['next_page_url'] = formalize_url(task_dct['platform'], page_info['next_page_url'])
     review_id_ls = [item['review_id'] for item in review_ls]
     if 'till' in task_dct and task_dct['till'] in review_id_ls:
-        next_page = None
+        page_info['next_page_url'] = None
         i = review_id_ls.index(task_dct['till'])
         review_ls = review_ls[:i]
 
     task_ls = []
-    if next_page:
-        task_dct['page'] = next_page
+    if page_info['next_page_url']:
+        task_dct['url'] = page_info['next_page_url']
         new_tp = tp.new_task(task_dct)
         new_tp.set_to('inner_output')
         task_ls.append(new_tp)
     else:
-        new_task = pipeflow.Task(b'task done')
-        new_task.set_to('notify')
-        task_ls.append(new_task)
+        task_ls.append(notify_task)
     if review_ls:
         info = {
             'platform': task_dct['platform'], 'asin': task_dct['asin'],
+            'page': page_info['cur_page'],
             'reviews': review_ls
         }
-        if not next_page:
+        if not page_info['next_page_url']:
             info['end'] = True
         new_tp = tp.new_task(info)
         new_tp.set_to('output')
@@ -140,7 +158,7 @@ async def handle_task(group, task):
             task_dct = tp.get_data()
             logger.info("%s %s %s" % (task_dct['platform'], task_dct['asin'],
                                       task_dct.get('till', '')))
-            task_dct["page"] = 1
+            task_dct["url"] = ""
             new_tp = tp.new_task(task_dct)
             new_tp.set_to('inner_output')
             return new_tp

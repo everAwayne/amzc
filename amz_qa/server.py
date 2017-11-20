@@ -32,6 +32,7 @@ async def handle_worker(group, task):
             {
                 "platform": "amazon_us",
                 "asin": "xxxx",
+                "page": 1,
                 "end": true,
                 "qas": [
                     {
@@ -49,7 +50,10 @@ async def handle_worker(group, task):
     tp = TaskProtocal(task)
     task_dct = tp.get_data()
     handle_cls = get_spider_by_platform(task_dct['platform'])
+    notify_task = pipeflow.Task(b'task done')
+    notify_task.set_to('notify')
     url = get_url_by_platform(task_dct['platform'], task_dct['asin'], task_dct['page'])
+    current_page = task_dct['page']
     try:
         soup = await get_page(url, timeout=60)
         handle = handle_cls(soup)
@@ -64,12 +68,12 @@ async def handle_worker(group, task):
         taks_info = ' '.join([task_dct['platform'], url])
         logger.error('Get page handle error\n'+taks_info, exc_info=exc_info)
         exc.__traceback__ = None
-        return
+        return notify_task
 
     is_qa_page = handle.is_qa_page()
     # abandon result
     if not is_qa_page:
-        return
+        return notify_task
 
     try:
         next_page, qa_ls = handle.get_info()
@@ -78,7 +82,7 @@ async def handle_worker(group, task):
         taks_info = ' '.join([task_dct['platform'], url])
         logger.error('Get page info error\n'+taks_info, exc_info=exc_info)
         exc.__traceback__ = None
-        return
+        return notify_task
 
     qa_id_ls = [item['qa_id'] for item in qa_ls]
     if 'till' in task_dct and task_dct['till'] in qa_id_ls:
@@ -93,12 +97,11 @@ async def handle_worker(group, task):
         new_tp.set_to('inner_output')
         task_ls.append(new_tp)
     else:
-        new_task = pipeflow.Task(b'task done')
-        new_task.set_to('notify')
-        task_ls.append(new_task)
+        task_ls.append(notify_task)
     if qa_ls:
         info = {
             'platform': task_dct['platform'], 'asin': task_dct['asin'],
+            'page': current_page,
             'qas': qa_ls
         }
         if not next_page:

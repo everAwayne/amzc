@@ -1,5 +1,6 @@
 import aio_pika
 import asyncio
+import functools
 from pipeflow.endpoints import AbstractCoroutineInputEndpoint, AbstractCoroutineOutputEndpoint
 from pipeflow.tasks import Task
 from util.log import logger
@@ -13,11 +14,18 @@ class RabbitMQClient:
         self._conf.update(conf)
 
 
+def ack(message):
+    if not message.processed:
+        message.ack()
+
+
 class RabbitmqInputEndpoint(RabbitMQClient, AbstractCoroutineInputEndpoint):
     """Rabbitmq aio input endpoint"""
 
-    def __init__(self, queue_name, loop=None, **conf):
+    def __init__(self, queue_name, loop=None, no_ack=False, qos=1, **conf):
         self._loop = loop
+        self._no_ack = no_ack
+        self._qos = qos
         if self._loop is None:
             self._loop = asyncio.get_event_loop()
         if queue_name is None:
@@ -32,7 +40,7 @@ class RabbitmqInputEndpoint(RabbitMQClient, AbstractCoroutineInputEndpoint):
             try:
                 self._connection = await aio_pika.connect_robust(**self._conf)
                 self._channel = await self._connection.channel()
-                await self._channel.set_qos(prefetch_count=1)
+                await self._channel.set_qos(prefetch_count=self._qos)
                 self._queue = await self._channel.declare_queue(self._queue_name, durable=True)
             except Exception as exc:
                 logger.error("Connect error")
@@ -44,11 +52,14 @@ class RabbitmqInputEndpoint(RabbitMQClient, AbstractCoroutineInputEndpoint):
     async def get(self):
         message = await self._inner_q.get()
         task = Task(message.body)
+        if self._no_ack:
+            task.set_confirm_handle(functools.partial(ack, message))
         return task
 
     async def _callback(self, message):
         await self._inner_q.put(message)
-        message.ack()
+        if not self._no_ack:
+            message.ack()
 
 
 class RabbitmqOutputEndpoint(RabbitMQClient, AbstractCoroutineOutputEndpoint):
@@ -78,18 +89,17 @@ class RabbitmqOutputEndpoint(RabbitMQClient, AbstractCoroutineOutputEndpoint):
                 break
 
     async def put(self, tasks):
-        msgs = []
-        for task in tasks:
-            msgs.append(task.get_raw_data())
-        await self._put(self._queue_name, msgs)
+        await self._put(self._queue_name, tasks)
         return True
 
-    async def _put(self, queue_name, msgs):
+    async def _put(self, queue_name, tasks):
         """Put a message into a list
         """
-        for msg in msgs:
+        for task in tasks:
             if self._persistent:
-                message = aio_pika.Message(msg, delivery_mode=aio_pika.DeliveryMode.PERSISTENT)
+                message = aio_pika.Message(task.get_raw_data(), delivery_mode=aio_pika.DeliveryMode.PERSISTENT)
             else:
-                message = aio_pika.Message(msg)
-            await self._channel.default_exchange.publish(message, routing_key=self._queue_name)
+                message = aio_pika.Message(task.get_raw_data())
+            ret = await self._channel.default_exchange.publish(message, routing_key=self._queue_name)
+            if ret:
+                task.confirm()

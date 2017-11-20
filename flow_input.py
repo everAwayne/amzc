@@ -69,7 +69,7 @@ class FlowInput(object):
         """
         assert isinstance(task_data, dict), "task_data isn't a dictionary"
         assert task_type in self.task_conf_dct, "task_type isn't supported"
-        queue_name = self.task_conf_dct[task_type][0]
+        queue_name = self.task_conf_dct[task_type][0]['name']
         dct = {
             "tid": task_type,
             "i": 0,

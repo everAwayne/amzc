@@ -1,3 +1,4 @@
+from urllib import parse
 from .amazon_us import AMZUSReviewInfo
 from .amazon_uk import AMZUKReviewInfo
 from .amazon_jp import AMZJPReviewInfo
@@ -35,7 +36,21 @@ PLATFORM_DOMAIN_MAP = {
 def get_spider_by_platform(platform):
     return PLATFORM_MAP[platform]
 
-def get_url_by_platform(platform, asin, page):
+def formalize_url(platform, url):
+    pr = parse.urlparse(url)
+    if not pr.scheme or not pr.netloc:
+        domain = PLATFORM_DOMAIN_MAP[platform]
+        url = parse.urlunparse(parse.ParseResult(scheme=pr.scheme if pr.scheme else 'https',
+                                                 netloc=pr.netloc if pr.netloc else domain,
+                                                 path=pr.path, params=pr.params, query=pr.query,
+                                                 fragment=pr.fragment))
+    return url
+
+def get_url_by_platform(platform, asin, path=None):
     domain = PLATFORM_DOMAIN_MAP[platform]
-    return "https://{domain}/product-reviews/{asin}?reviewerType=all_reviews&pageNumber={page}&pageSize=50&sortBy=recent".format(
-            domain=domain, asin=asin, page=page)
+    if path:
+        return "https://{domain}{path}?reviewerType=all_reviews&pageSize=50&sortBy=recent".format(
+                domain=domain, path=path)
+    else:
+        return "https://{domain}/product-reviews/{asin}?reviewerType=all_reviews&pageSize=50&sortBy=recent".format(
+                domain=domain, asin=asin)
