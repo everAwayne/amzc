@@ -7,9 +7,9 @@ import pipeflow
 from util.log import logger
 from util.task_protocal import TaskProtocal
 from util.rabbitmq_endpoints import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
+from config import RABBITMQ_CONF, REDIS_CONF, BSR_REDIS_CONF
 
 
-POPT_REDIS_CONF = {'host': '192.168.0.10', 'port': 6379, 'db': 10, 'password': None}
 POPT_KEY_PREFIX = "bestseller:popt:"
 CURVE_FUNC = lambda x,a,b:math.log(a/x+1)/b
 popt_map = {}
@@ -56,7 +56,7 @@ async def handle_worker(group, task):
 
 def get_popt():
     global popt_map
-    redis_client = redis.Redis(**POPT_REDIS_CONF)
+    redis_client = redis.Redis(**REDIS_CONF)
 
     def redis_execute(func):
         @functools.wraps(func)
@@ -90,9 +90,8 @@ def get_popt():
 
 def run():
     get_popt()
-    input_end = RabbitmqInputEndpoint('amz_bsr_result:input', host='192.168.0.10', port=5672,
-            virtualhost="/", heartbeat_interval=120, login='guest', password='guest')
-    output_end = pipeflow.RedisOutputEndpoint('amz_product:output:bsr', host='192.168.0.10', port=6379, db=5, password=None)
+    input_end = RabbitmqInputEndpoint('amz_bsr_result:input', **RABBITMQ_CONF)
+    output_end = pipeflow.RedisOutputEndpoint('amz_product:output:bsr', **BSR_REDIS_CONF)
 
     server = pipeflow.Server()
     group = server.add_group('main', 1)

@@ -5,11 +5,7 @@ import zlib
 import random
 import functools
 import threading
-
-CONF_HOST = "192.168.0.10"
-CONF_PORT = 6379
-CONF_DB = 10
-CONF_PASSWD = None
+from config import REDIS_CONF
 
 
 def redis_execute(func):
@@ -50,7 +46,7 @@ class FlowInput(object):
         if not hasattr(FlowInput, "task_conf_dct") or not hasattr(FlowInput, "rabbitmq_conf_dct"):
             with FlowInput._lock:
                 if not hasattr(FlowInput, "task_conf_dct") or not hasattr(FlowInput, "rabbitmq_conf_dct"):
-                    redis_client = redis.Redis(host=CONF_HOST, port=CONF_PORT, db=CONF_DB, password=CONF_PASSWD)
+                    redis_client = redis.Redis(**REDIS_CONF)
                     task_conf_dct = redis_execute(redis_client.hgetall)("task_conf")
                     FlowInput.task_conf_dct = dict([(k, json.loads(v)) for k,v in task_conf_dct.items()])
                     rabbitmq_conf_dct = redis_execute(redis_client.hgetall)("rabbitmq_conf")

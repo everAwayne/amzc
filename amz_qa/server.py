@@ -9,6 +9,7 @@ from util.prrequest import get_page
 from .spiders.dispatch import get_spider_by_platform, get_url_by_platform
 from util.task_protocal import TaskProtocal
 from util.rabbitmq_endpoints import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
+from config import RABBITMQ_CONF
 
 
 MAX_WORKERS = 30
@@ -154,12 +155,9 @@ async def handle_task(group, task):
 
 
 def run():
-    input_end = RabbitmqInputEndpoint('amz_qa:input', host='192.168.0.10', port=5672,
-            virtualhost="/", heartbeat_interval=120, login='guest', password='guest')
-    back_end = RabbitmqOutputEndpoint('amz_qa:input', host='192.168.0.10', port=5672,
-            virtualhost="/", heartbeat_interval=120, login='guest', password='guest')
-    output_end = RabbitmqOutputEndpoint('amz_qa:output', host='192.168.0.10', port=5672,
-            virtualhost="/", heartbeat_interval=120, login='guest', password='guest')
+    input_end = RabbitmqInputEndpoint('amz_qa:input', **RABBITMQ_CONF)
+    back_end = RabbitmqOutputEndpoint('amz_qa:input', **RABBITMQ_CONF)
+    output_end = RabbitmqOutputEndpoint('amz_qa:output', **RABBITMQ_CONF)
     queue = asyncio.Queue()
     notify_input_end = pipeflow.QueueInputEndpoint(queue)
     notify_output_end = pipeflow.QueueOutputEndpoint(queue)

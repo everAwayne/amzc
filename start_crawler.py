@@ -6,7 +6,8 @@ from util import daemon
 
 
 CRAWLER_LS = ['flow_core', 'callback',
-              'bsr', 'proxy_product', 'vps_product', 'bsr_result', 'review', 'qa']
+              'bsr', 'proxy_product', 'vps_product', 'bsr_result', 'review', 'qa',
+              'keyword', 'relationship']
 
 
 if __name__ == '__main__':
@@ -36,4 +37,8 @@ if __name__ == '__main__':
         from amz_qa import server
     elif args.crawler == 'callback':
         from http_callback import server
+    elif args.crawler == 'keyword':
+        from amz_keyword import server
+    elif args.crawler == 'relationship':
+        from amz_relationship import server
     server.run()

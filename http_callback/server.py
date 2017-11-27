@@ -6,6 +6,7 @@ import pipeflow
 from util.log import logger
 from util.task_protocal import TaskProtocal
 from util.rabbitmq_endpoints import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
+from config import RABBITMQ_CONF
 
 
 MAX_WORKERS = 15
@@ -30,8 +31,7 @@ async def handle_worker(group, task):
 
 
 def run():
-    input_end = RabbitmqInputEndpoint('http_callback:input', host='192.168.0.10', port=5672,
-            virtualhost="/", heartbeat_interval=120, login='guest', password='guest')
+    input_end = RabbitmqInputEndpoint('http_callback:input', **RABBITMQ_CONF)
     server = pipeflow.Server()
     group = server.add_group('main', MAX_WORKERS)
     group.add_input_endpoint('input', input_end)

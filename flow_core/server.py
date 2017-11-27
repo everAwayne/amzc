@@ -7,9 +7,9 @@ import pipeflow
 from util.log import logger
 from util.task_protocal import TaskProtocal
 from util.rabbitmq_endpoints import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
+from config import REDIS_CONF
 
 
-FLOW_REDIS_CONF = {'host': '192.168.0.10', 'port': 6379, 'db': 10, 'password': None}
 FLOW_TASK_CONF = "task_conf"
 FLOW_NODE_CONF = "node_conf"
 MAX_WORKERS = 3
@@ -26,7 +26,7 @@ conf = {
         socket.TCP_KEEPINTVL: 60,
     }
 }
-conf.update(FLOW_REDIS_CONF)
+conf.update(REDIS_CONF)
 redis_client = redis.Redis(**conf)
 
 
