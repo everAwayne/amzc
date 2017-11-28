@@ -6,8 +6,7 @@ from util.prrequest import get_page
 from util.task_protocal import TaskProtocal
 from error import RequestError, CaptchaError
 from util.rabbitmq_endpoints import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
-from .spiders.url import get_search_index_url, get_host
-from .spiders.page import AmazonSearchPage
+from .spiders.dispatch import get_spider_by_platform, get_search_index_url, formalize_url
 from config import RABBITMQ_CONF
 
 
@@ -16,17 +15,44 @@ task_count = 0
 
 
 async def handle_worker(group, task):
+    """Handle amz_keyword task
+
+    [input] task data format:
+        JSON:
+            {
+                "platform": "amazon_us",
+                "keyword": "xx xxx",
+                "end_page": 10,
+                "page": 1,
+                "url": "xxxx",
+            }
+    [output] result data format:
+        JSON:
+            {
+                "platform": "amazon_us",
+                "keyword": "xx xxx",
+                "page": 1,
+                "end": true,
+                "status": 0,
+                "products": [
+                    {'is_sponsored': 1, 'rank': 1, 'asin': 'B073S6F9JQ'}
+                ],
+                "count": 10,
+                "category": ['xxx1','xx2'],
+            }
     """
-    """
+
     tp = TaskProtocal(task)
     task_dct = tp.get_data()
     notify_task = pipeflow.Task(b'task done')
     notify_task.set_to('notify')
     if task_dct['page'] > task_dct['end_page']:
         return notify_task
+    handle_cls = get_spider_by_platform(task_dct['platform'])
 
     try:
         soup = await get_page(task_dct['url'], timeout=60)
+        handle = handle_cls(soup)
     except RequestError:
         tp.set_to('inner_output')
         return tp
@@ -52,19 +78,35 @@ async def handle_worker(group, task):
         tps.append(new_tp)
         return tps
 
-    page = AmazonSearchPage(soup)
-    task_ls = []
-    host = get_host(task_dct['platform'])
-    next_url = page.get_next_url(host)
+    is_search_page = handle.is_search_page()
+    if not is_search_page:
+        return notify_task
 
+    try:
+        next_url = handle.get_next_url()
+        asin_ls = handle.get_asins()
+        result_dct = handle.get_search_result()
+    except Exception as exc:
+        exc_info = (type(exc), exc, exc.__traceback__)
+        taks_info = ' '.join([task_dct['platform'], task_dct['url']])
+        logger.error('Get page info error\n'+taks_info, exc_info=exc_info)
+        exc.__traceback__ = None
+        return notify_task
+
+    if next_url is not None:
+        next_url = formalize_url(task_dct['platform'], next_url)
+
+    task_ls = []
     info = {
         'platform': task_dct['platform'],
         'keyword': task_dct['keyword'],
-        'products': page.products,
-        'right_products': page.right_products,
-        'page': task_dct['page']
+        'page': task_dct['page'],
+        'products': asin_ls,
+        'count': result_dct['count'],
+        'category': result_dct['category'],
     }
-    next_page = int(task_dct['page']) + 1
+    print(info)
+    next_page = task_dct['page'] + 1
     if next_url and next_page <= task_dct['end_page']:
         task_dct['page'] = next_page
         task_dct['url'] = next_url
@@ -81,8 +123,23 @@ async def handle_worker(group, task):
     task_ls.append(new_tp)
     return task_ls
 
+
 async def handle_task(group, task):
+    """Handle amz_keyword task
+
+    [input] task data format:
+        JSON:
+            {
+                "platform": "amazon_us",
+                "keyword": "xx xxx",
+                "end_page": 10,
+            }
+    [notify] task data format:
+        BYTES:
+            b"task done"
+    """
     global  task_count
+
     from_name = task.get_from()
     if from_name == 'input':
         tp = TaskProtocal(task)
@@ -95,9 +152,7 @@ async def handle_task(group, task):
                 group.suspend_endpoint('input')
             task_dct = tp.get_data()
             logger.info("%s %s" % (task_dct['platform'], task_dct['keyword']))
-            if 'end_page' not in task_dct:
-                task_dct['end_page'] = 20
-
+            task_dct.setdefault('end_page', 20)
             task_dct['page'] = 1
             task_dct['url'] = get_search_index_url(task_dct['platform'], task_dct['keyword'])
             new_tp = tp.new_task(task_dct)
