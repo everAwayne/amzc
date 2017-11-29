@@ -40,15 +40,13 @@ async def handle_worker(group, task):
     if tid not in flow_conf[FLOW_TASK_CONF]:
         logger.error("Task ID [%s] error" % tid)
         return
-    if step+1 >= len(flow_conf[FLOW_TASK_CONF][tid]):
-        logger.error("Task step error [%s:%s]" % (tid, step))
-        return
-    endpoint_name = flow_conf[FLOW_TASK_CONF][tid][step+1]['name']
     task_ls = []
     task_data = tp.get_data()
-    next_tp = tp.new_task(task_data, next_step=True)
-    next_tp.set_to(endpoint_name)
-    task_ls.append(next_tp)
+    if step+1 < len(flow_conf[FLOW_TASK_CONF][tid]):
+        endpoint_name = flow_conf[FLOW_TASK_CONF][tid][step+1]['name']
+        next_tp = tp.new_task(task_data, next_step=True)
+        next_tp.set_to(endpoint_name)
+        task_ls.append(next_tp)
     for f_tid in flow_conf[FLOW_TASK_CONF][tid][step].get('fork', []):
         endpoint_name = flow_conf[FLOW_TASK_CONF][f_tid][0]['name']
         fork_tp = tp.new_task(task_data, tid=f_tid)
@@ -106,7 +104,6 @@ def run():
     server = pipeflow.Server()
     server.add_worker(refresh_routine)
     group = server.add_group('main', MAX_WORKERS)
-    group.set_handle(handle_worker)
     for node in flow_conf[FLOW_NODE_CONF]:
         if 'i' in flow_conf[FLOW_NODE_CONF][node]:
             for conf in flow_conf[FLOW_NODE_CONF][node]['i']:
@@ -134,4 +131,5 @@ def run():
                                                heartbeat_interval=conf['heartbeat'],
                                                login=conf['login'], password=conf['password'])
                     group.add_input_endpoint(conf['queue'], ep)
+    group.set_handle(handle_worker)
     server.run()

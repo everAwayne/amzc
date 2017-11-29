@@ -41,8 +41,8 @@ async def handle_worker(group, task):
     tp = TaskProtocal(task)
     info = tp.get_data()
     popt_dct = popt_map.get(info['platform'], {})
-    cat_name = info['detail_info'].get('cat_1_name', '').strip().lower()
-    cat_rank = info['detail_info'].get('cat_1_rank', -1)
+    cat_name = info['detail_info']['cat_1_name'].strip().lower() if info['detail_info']['cat_1_name'] else ''
+    cat_rank = info['detail_info']['cat_1_rank'] if info['detail_info']['cat_1_rank'] is not None else -1
     info['detail_info']['cat_1_sales'] = -1
     if cat_name and cat_rank != -1 and popt_dct:
         info['detail_info']['cat_1_sales'] = CURVE_FUNC(cat_rank, *popt_dct.get(cat_name, popt_dct['default']))
