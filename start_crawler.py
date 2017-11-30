@@ -5,7 +5,7 @@ import argparse
 from util import daemon
 
 
-CRAWLER_LS = ['flow_core', 'callback',
+CRAWLER_LS = ['flow_core', 'callback', 'statistic',
               'bsr', 'proxy_product', 'vps_product', 'bsr_result', 'review', 'qa',
               'keyword', 'relationship']
 
@@ -41,4 +41,6 @@ if __name__ == '__main__':
         from amz_keyword import server
     elif args.crawler == 'relationship':
         from amz_relationship import server
+    elif args.crawler == 'statistic':
+        from statistic import server
     server.run()

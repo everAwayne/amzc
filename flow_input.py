@@ -40,6 +40,7 @@ class FlowInput(object):
             self._local.parameters = parameters
             self._local.connection = pika.BlockingConnection(parameters)
             self._local.channel = self._local.connection.channel()
+            self._local.channel.confirm_delivery()
 
     @staticmethod
     def load_conf():
@@ -66,24 +67,46 @@ class FlowInput(object):
         assert isinstance(task_data, dict), "task_data isn't a dictionary"
         assert task_type in self.task_conf_dct, "task_type isn't supported"
         queue_name = self.task_conf_dct[task_type][0]['name']
-        dct = {
+        task_dct = {
             "tid": task_type,
             "i": 0,
             "data": task_data
         }
-        retry = 4
+        statistic_dct = {
+            "tid": 'stats',
+            "i": 0,
+            "data": {
+                'extra': {
+                    'stats': {
+                        'tid': task_type,
+                        'step': 0
+                    }
+                }
+            }
+        }
+        res = False
+        retry = 3
         while retry > 0:
             retry -= 1
             try:
-                return self._local.channel.basic_publish(exchange='', routing_key=queue_name,
-                                            body=zlib.compress(json.dumps(dct)))
+                res = self._local.channel.basic_publish(exchange='', routing_key=queue_name,
+                                            body=zlib.compress(json.dumps(task_dct)))
             except (pika.exceptions.ChannelClosed, pika.exceptions.ConnectionClosed):
                 print "[flow input]=====connection closed====="
                 self._local.connection.close()
                 try:
                     self._local.connection = pika.BlockingConnection(self._local.parameters)
                     self._local.channel = connection.channel()
+                    self._local.channel.confirm_delivery()
                 except:
                     print "[flow input]=====reconnect error====="
                     pass
-        return False
+            else:
+                break
+        if res:
+            try:
+                self._local.channel.basic_publish(exchange='', routing_key='statistic:input',
+                                            body=zlib.compress(json.dumps(statistic_dct)))
+            except (pika.exceptions.ChannelClosed, pika.exceptions.ConnectionClosed):
+                pass
+        return res

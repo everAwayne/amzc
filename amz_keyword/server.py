@@ -105,7 +105,6 @@ async def handle_worker(group, task):
         'count': result_dct['count'],
         'category': result_dct['category'],
     }
-    print(info)
     next_page = task_dct['page'] + 1
     if next_url and next_page <= task_dct['end_page']:
         task_dct['page'] = next_page
