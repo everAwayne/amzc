@@ -47,3 +47,8 @@ class AMZSearchInfo:
         if text_ls:
             dct['category'] = [item.strip() for item in text_ls]
         return dct
+
+    def get_nav_search(self):
+        text_ls = self.soup.xpath('//div[@id="navbar"]//span[@class="nav-search-label"]/text()')
+        text = ' '.join(text_ls).strip()
+        return text

@@ -11,7 +11,7 @@ import pipeflow
 from .models import AMZTaskStatistic
 from util.log import logger
 from util.task_protocal import TaskProtocal
-from util.rabbitmq_endpoints import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
+from pipeflow import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
 from config import RABBITMQ_CONF, STATS_DB_USER_NAME, STATS_DB_USER_PW, STATS_DB_SEVER_ADDR
 
 

@@ -6,7 +6,7 @@ import functools
 import pipeflow
 from util.log import logger
 from util.task_protocal import TaskProtocal
-from util.rabbitmq_endpoints import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
+from pipeflow import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
 from config import RABBITMQ_CONF, REDIS_CONF, BSR_REDIS_CONF
 
 

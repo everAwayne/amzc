@@ -5,7 +5,7 @@ from util.log import logger
 from util.prrequest import get_page
 from util.task_protocal import TaskProtocal
 from error import RequestError, CaptchaError
-from util.rabbitmq_endpoints import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
+from pipeflow import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
 from .spiders.dispatch import get_spider_by_platform, get_search_index_url, formalize_url
 from config import RABBITMQ_CONF
 
@@ -39,6 +39,7 @@ async def handle_worker(group, task):
                 ],
                 "count": 10,
                 "category": ['xxx1','xx2'],
+                "department": "xxxxx",
             }
     """
 
@@ -86,6 +87,7 @@ async def handle_worker(group, task):
         next_url = handle.get_next_url()
         asin_ls = handle.get_asins()
         result_dct = handle.get_search_result()
+        department = handle.get_nav_search()
     except Exception as exc:
         exc_info = (type(exc), exc, exc.__traceback__)
         taks_info = ' '.join([task_dct['platform'], task_dct['url']])
@@ -104,6 +106,7 @@ async def handle_worker(group, task):
         'products': asin_ls,
         'count': result_dct['count'],
         'category': result_dct['category'],
+        'department': department,
     }
     next_page = task_dct['page'] + 1
     if next_url and next_page <= task_dct['end_page']:

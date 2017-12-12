@@ -1,3 +1,4 @@
+import sys
 import json
 import redis
 import pika
@@ -6,6 +7,11 @@ import random
 import functools
 import threading
 from config import REDIS_CONF
+
+
+PY3 = sys.version_info > (3,)
+b_to_str = lambda x:x.decode('utf-8') if PY3 else x
+str_to_b = lambda x:x.encode('utf-8') if PY3 else x
 
 
 def redis_execute(func):
@@ -49,11 +55,11 @@ class FlowInput(object):
                 if not hasattr(FlowInput, "task_conf_dct") or not hasattr(FlowInput, "rabbitmq_conf_dct"):
                     redis_client = redis.Redis(**REDIS_CONF)
                     task_conf_dct = redis_execute(redis_client.hgetall)("task_conf")
-                    FlowInput.task_conf_dct = dict([(k, json.loads(v)) for k,v in task_conf_dct.items()])
+                    FlowInput.task_conf_dct = dict([(b_to_str(k), json.loads(b_to_str(v)))
+                                                    for k,v in task_conf_dct.items()])
                     rabbitmq_conf_dct = redis_execute(redis_client.hgetall)("rabbitmq_conf")
-                    FlowInput.rabbitmq_conf_dct = {}
-                    FlowInput.rabbitmq_conf_dct['addr'] = json.loads(rabbitmq_conf_dct['addr'])
-                    FlowInput.rabbitmq_conf_dct['authc'] = json.loads(rabbitmq_conf_dct['authc'])
+                    FlowInput.rabbitmq_conf_dct = dict([(b_to_str(k), json.loads(b_to_str(v)))
+                                                        for k,v in rabbitmq_conf_dct.items()])
                     redis_client.connection_pool.disconnect()
 
     def send_task(self, task_type, task_data):
@@ -90,23 +96,23 @@ class FlowInput(object):
             retry -= 1
             try:
                 res = self._local.channel.basic_publish(exchange='', routing_key=queue_name,
-                                            body=zlib.compress(json.dumps(task_dct)))
+                        body=zlib.compress(str_to_b(json.dumps(task_dct))))
             except (pika.exceptions.ChannelClosed, pika.exceptions.ConnectionClosed):
-                print "[flow input]=====connection closed====="
+                print("[flow input]=====connection closed=====")
                 self._local.connection.close()
                 try:
                     self._local.connection = pika.BlockingConnection(self._local.parameters)
                     self._local.channel = connection.channel()
                     self._local.channel.confirm_delivery()
                 except:
-                    print "[flow input]=====reconnect error====="
+                    print("[flow input]=====reconnect error=====")
                     pass
             else:
                 break
         if res:
             try:
                 self._local.channel.basic_publish(exchange='', routing_key='statistic:input',
-                                            body=zlib.compress(json.dumps(statistic_dct)))
+                                            body=zlib.compress(str_to_b(json.dumps(statistic_dct))))
             except (pika.exceptions.ChannelClosed, pika.exceptions.ConnectionClosed):
                 pass
         return res

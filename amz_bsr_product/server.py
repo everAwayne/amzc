@@ -8,7 +8,7 @@ from util.log import logger
 from util.prrequest import get_page
 from .spiders.dispatch import get_spider_by_platform
 from util.task_protocal import TaskProtocal
-from util.rabbitmq_endpoints import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
+from pipeflow import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
 from config import RABBITMQ_CONF
 
 
