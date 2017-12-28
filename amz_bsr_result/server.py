@@ -1,4 +1,5 @@
 import json
+import time
 import math
 import redis
 import socket
@@ -46,9 +47,16 @@ async def handle_worker(group, task):
     info['detail_info']['cat_1_sales'] = -1
     if cat_name and cat_rank != -1 and popt_dct:
         info['detail_info']['cat_1_sales'] = CURVE_FUNC(cat_rank, *popt_dct.get(cat_name, popt_dct['default']))
-    info['bs_cate'] = info['extra']['bsr']['bs_cate']
-    info['date'] = info['extra']['bsr']['date']
-    del info['extra']
+    if info.get('extra') and info['extra'].get('bsr'):
+        info['bs_cate'] = info['extra']['bsr']['bs_cate']
+        info['date'] = info['extra']['bsr']['date']
+        del info['extra']
+    else:
+        cate = ''
+        if info['detail_info']['cat_ls']:
+            cate = ':'.join(info['detail_info']['cat_ls'][0]['name_ls'])
+        info['bs_cate'] = [cate]
+        info['date'] = time.strftime("%Y-%m-%d", time.localtime())
     res = pipeflow.Task(json.dumps(info).encode('utf-8'))
     res.set_to('output')
     return res

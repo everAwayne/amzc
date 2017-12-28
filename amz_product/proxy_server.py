@@ -26,6 +26,7 @@ async def handle_worker(group, task):
             {
                 'asin': 'B02KDI8NID8',
                 'platform': 'amazon_us',
+                'parent_asin': 'B02KDI8NID8',
                 'title': 'Active Wow Teeth Whitening Charcoal Powder Natural',
                 'brand': 'Active Wow',
                 'price': 24.79,
@@ -106,13 +107,12 @@ async def handle_worker(group, task):
 
 def run():
     input_end = RabbitmqInputEndpoint('amz_product:input', **RABBITMQ_CONF)
-    b_input_end = RabbitmqOutputEndpoint('amz_product:input', **RABBITMQ_CONF)
-    output_end = RabbitmqOutputEndpoint('amz_product:output', **RABBITMQ_CONF)
+    output_end = RabbitmqOutputEndpoint(['amz_product:input', 'amz_product:output'], **RABBITMQ_CONF)
 
     server = pipeflow.Server()
     group = server.add_group('main', MAX_WORKERS)
     group.set_handle(handle_worker)
     group.add_input_endpoint('input', input_end)
-    group.add_output_endpoint('input_back', b_input_end)
-    group.add_output_endpoint('output', output_end)
+    group.add_output_endpoint('input_back', output_end, 'amz_product:input')
+    group.add_output_endpoint('output', output_end, 'amz_product:output')
     server.run()

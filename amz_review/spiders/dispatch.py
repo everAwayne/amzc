@@ -8,6 +8,7 @@ from .amazon_es import AMZESReviewInfo
 from .amazon_it import AMZITReviewInfo
 from .amazon_ca import AMZCAReviewInfo
 from .amazon_in import AMZINReviewInfo
+from .amazon_au import AMZAUReviewInfo
 
 PLATFORM_MAP = {
     'amazon_us': AMZUSReviewInfo,
@@ -19,6 +20,7 @@ PLATFORM_MAP = {
     'amazon_it': AMZITReviewInfo,
     'amazon_ca': AMZCAReviewInfo,
     'amazon_in': AMZINReviewInfo,
+    'amazon_au': AMZAUReviewInfo,
 }
 
 PLATFORM_DOMAIN_MAP = {
@@ -31,6 +33,7 @@ PLATFORM_DOMAIN_MAP = {
     'amazon_es': 'www.amazon.es',
     'amazon_ca': 'www.amazon.ca',
     'amazon_in': 'www.amazon.in',
+    'amazon_au': 'www.amazon.com.au',
 }
 
 def get_spider_by_platform(platform):

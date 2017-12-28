@@ -173,8 +173,7 @@ async def handle_task(group, task):
 
 def run():
     input_end = RabbitmqInputEndpoint('amz_review:input', **RABBITMQ_CONF)
-    back_end = RabbitmqOutputEndpoint('amz_review:input', **RABBITMQ_CONF)
-    output_end = RabbitmqOutputEndpoint('amz_review:output', **RABBITMQ_CONF)
+    output_end = RabbitmqOutputEndpoint(['amz_review:input', 'amz_review:output'], **RABBITMQ_CONF)
     queue = asyncio.Queue()
     notify_input_end = pipeflow.QueueInputEndpoint(queue)
     notify_output_end = pipeflow.QueueOutputEndpoint(queue)
@@ -188,13 +187,13 @@ def run():
     task_group.set_handle(handle_task)
     task_group.add_input_endpoint('input', input_end)
     task_group.add_input_endpoint('notify', notify_input_end)
-    task_group.add_output_endpoint('input_back', back_end)
+    task_group.add_output_endpoint('input_back', output_end, 'amz_review:input')
     task_group.add_output_endpoint('inner_output', inner_output_end)
 
     worker_group = server.add_group('work', MAX_WORKERS)
     worker_group.set_handle(handle_worker)
     worker_group.add_input_endpoint('inner_input', inner_input_end)
-    worker_group.add_output_endpoint('output', output_end)
+    worker_group.add_output_endpoint('output', output_end, 'amz_review:output')
     worker_group.add_output_endpoint('inner_output', inner_output_end)
     worker_group.add_output_endpoint('notify', notify_output_end)
 

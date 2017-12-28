@@ -6,7 +6,6 @@ import asyncio
 import pipeflow
 from util.log import logger
 from util.task_protocal import TaskProtocal
-from pipeflow import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
 from config import REDIS_CONF
 
 
@@ -91,6 +90,21 @@ def refresh_conf():
                 item['fork'] = set(item.get('fork',[])) | node_fork_map[item['name']]
     flow_conf[FLOW_TASK_CONF] = task_conf_dct
     flow_conf[FLOW_NODE_CONF] = node_conf_dct
+    merge_ls = []
+    merge_dct = {}
+    for item in node_conf_dct.values():
+        if 'i' in item:
+            for conf in item['i']:
+                queue = conf.pop('queue')
+                if conf not in merge_ls:
+                    merge_ls.append(conf)
+                    index = len(merge_ls)-1
+                    merge_dct[index] = []
+                else:
+                    index = merge_ls.index(conf)
+                merge_dct[index].append(queue)
+    flow_conf['merge_ls'] = merge_ls
+    flow_conf['merge_dct'] = merge_dct
 
 
 async def refresh_routine(server):
@@ -104,20 +118,23 @@ def run():
     server = pipeflow.Server()
     server.add_worker(refresh_routine)
     group = server.add_group('main', MAX_WORKERS)
+    for i in range(len(flow_conf['merge_ls'])):
+        conf = flow_conf['merge_ls'][i]
+        queue_ls = flow_conf['merge_dct'][i]
+        if conf['type'] == 'redis':
+            ep = pipeflow.RedisOutputEndpoint(queue_ls, host=conf['host'],
+                                              port=conf['port'], db=conf['db'],
+                                              password=conf['password'])
+            for queue in queue_ls:
+                group.add_output_endpoint(queue, ep, queue)
+        elif conf['type'] == 'rabbitmq':
+            ep = pipeflow.RabbitmqOutputEndpoint(queue_ls, host=conf['host'],
+                                        port=conf['port'], virtualhost=conf['virtualhost'],
+                                        heartbeat_interval=conf['heartbeat'],
+                                        login=conf['login'], password=conf['password'])
+            for queue in queue_ls:
+                group.add_output_endpoint(queue, ep, queue)
     for node in flow_conf[FLOW_NODE_CONF]:
-        if 'i' in flow_conf[FLOW_NODE_CONF][node]:
-            for conf in flow_conf[FLOW_NODE_CONF][node]['i']:
-                if conf['type'] == 'redis':
-                    ep = pipeflow.RedisOutputEndpoint(conf['queue'], host=conf['host'],
-                                                      port=conf['port'], db=conf['db'],
-                                                      password=conf['password'])
-                    group.add_output_endpoint(conf['queue'], ep)
-                elif conf['type'] == 'rabbitmq':
-                    ep = RabbitmqOutputEndpoint(conf['queue'], host=conf['host'],
-                                                port=conf['port'], virtualhost=conf['virtualhost'],
-                                                heartbeat_interval=conf['heartbeat'],
-                                                login=conf['login'], password=conf['password'])
-                    group.add_output_endpoint(conf['queue'], ep)
         if 'o' in flow_conf[FLOW_NODE_CONF][node]:
             for conf in flow_conf[FLOW_NODE_CONF][node]['o']:
                 if conf['type'] == 'redis':
@@ -126,7 +143,7 @@ def run():
                                                      password=conf['password'])
                     group.add_input_endpoint(conf['queue'], ep)
                 elif conf['type'] == 'rabbitmq':
-                    ep = RabbitmqInputEndpoint(conf['queue'], no_ack=True, qos=MAX_WORKERS, host=conf['host'],
+                    ep = pipeflow.RabbitmqInputEndpoint(conf['queue'], no_ack=True, qos=MAX_WORKERS, host=conf['host'],
                                                port=conf['port'], virtualhost=conf['virtualhost'],
                                                heartbeat_interval=conf['heartbeat'],
                                                login=conf['login'], password=conf['password'])
