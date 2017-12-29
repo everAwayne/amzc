@@ -49,6 +49,7 @@ async def handle_worker(group, task):
                     'also_viewed': [],
                     'viewed_also_bought': [],
                 },
+                'sku_info': [],
                 'fba': 1,
                 'review': 4.6,
                 'review_count': 9812,
