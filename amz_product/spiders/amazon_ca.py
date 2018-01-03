@@ -123,6 +123,8 @@ class AMZCAProductInfo(AMZProductInfo):
                     product_info_dct['shipping_weight'] = text
                 elif 'date first available' in name:
                     product_info_dct['date_first_available'] = text
+                else:
+                    product_info_dct[name] = text
         elif div2:
             div = div2[0]
             li_ls = div.xpath(".//li[@id='SalesRank']")
@@ -152,6 +154,8 @@ class AMZCAProductInfo(AMZProductInfo):
                     product_info_dct['shipping_weight'] = text
                 elif 'date first available' in name:
                     product_info_dct['date_first_available'] = text
+                else:
+                    product_info_dct[name] = text
         elif tr_ls1:
             for tr in tr_ls1:
                 k_ls = tr.xpath("./td[@class='label']/text()")
@@ -180,6 +184,8 @@ class AMZCAProductInfo(AMZProductInfo):
                         product_info_dct['shipping_weight'] = text
                     elif 'date first available' in name:
                         product_info_dct['date_first_available'] = text
+                    else:
+                        product_info_dct[name] = text
         elif tr_ls2:
             for tr in tr_ls2:
                 k_ls = tr.xpath("./th/text()")
@@ -212,4 +218,6 @@ class AMZCAProductInfo(AMZProductInfo):
                         product_info_dct['shipping_weight'] = text
                     elif 'date first available' in name:
                         product_info_dct['date_first_available'] = text
+                    else:
+                        product_info_dct[name] = text
         return {"bsr_info": bsr_dct, "product_info": product_info_dct}

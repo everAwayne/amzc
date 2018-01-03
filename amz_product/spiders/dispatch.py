@@ -40,3 +40,6 @@ def get_url_by_platform(platform, asin):
     domain = PLATFORM_DOMAIN_MAP[platform]
     return "https://{domain}/dp/{asin}/ref=sr_1_1?qid={time}&sr=1-1&keywords={asin}".format(
             domain=domain, asin=asin, time=int(time.time()))
+
+def get_domain_by_platform(platform):
+    return PLATFORM_DOMAIN_MAP[platform]

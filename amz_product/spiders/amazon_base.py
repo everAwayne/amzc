@@ -152,3 +152,29 @@ class AMZProductInfo:
                     sku_ls = list(dct)
 
         return sku_ls
+
+
+    def get_offer_listing_id(self):
+        offer_listing_id = ''
+        ls = self.soup.xpath("//input[@id='offerListingID']/@value")
+        if ls:
+            offer_listing_id = ls[0]
+        return offer_listing_id
+
+
+    def get_ue_id(self):
+        ue_id = ''
+        text = self.soup.xpath("//script[contains(text(),'ue_id')]/text()")[0]
+        reg_ret = re.search(r'''\s+ue_id\s*=\s*(?:"|')([^"']+)(?:"|')''', text, re.S)
+        if reg_ret:
+            ue_id = reg_ret.group(1)
+        return ue_id
+
+
+    def get_session_id(self):
+        session_id = ''
+        text = self.soup.xpath("//script[contains(text(),'ue_sid')]/text()")[0]
+        reg_ret = re.search(r'''\s+ue_sid\s*=\s*(?:"|')([^"']+)(?:"|')''', text, re.S)
+        if reg_ret:
+            session_id = reg_ret.group(1)
+        return session_id

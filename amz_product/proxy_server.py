@@ -1,15 +1,20 @@
 import json
+import time
 import pipeflow
+from lxml import etree
 from error import RequestError, CaptchaError
 from util.log import logger
-from util.prrequest import get_page
+from util.prrequest import get_page, GetPageSession
 from util.task_protocal import TaskProtocal
-from .spiders.dispatch import get_spider_by_platform, get_url_by_platform
+from .spiders.dispatch import get_spider_by_platform, get_url_by_platform, get_domain_by_platform
 from pipeflow import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
 from config import RABBITMQ_CONF
 
 
 MAX_WORKERS = 40
+COLLECT_COUPON = "https://{domain:s}/gp/collect-coupon/handler/applicable_promotion_list_hover_count.html?ref_=apl_desktop_imp"
+ADD_TO_CART = "https://{domain:s}/gp/add-to-cart/json/ref=dp_start-bbf_1_glance"
+ADD_TO_CART_DATA = "clientName=SmartShelf&ASIN={asin:s}&verificationSessionID={session_id:s}&offerListingID={offer_listing_id:s}&quantity={qty:d}"
 
 
 async def handle_worker(group, task):
@@ -19,7 +24,8 @@ async def handle_worker(group, task):
         JSON:
             {
                 "platform": "amazon_us",
-                "asin": "B02KDI8NID8"
+                "asin": "B02KDI8NID8",
+                "with_qty": True,
             }
     [output] result data format:
         JSON:
@@ -60,19 +66,45 @@ async def handle_worker(group, task):
                     "4": 9,
                     "5": 80
                 },
-                'img': 'https://images-na.ssl-images-amazon.com/images/I/514RSPIJMKL.jpg'
+                'img': 'https://images-na.ssl-images-amazon.com/images/I/514RSPIJMKL.jpg',
+                'qty': 123, #None
             }
     """
     tp = TaskProtocal(task)
     from_end = tp.get_from()
     task_dct = tp.get_data()
-    logger.info("%s %s" % (task_dct['platform'], task_dct['asin']))
+    logger.info("%s %s %s" % (task_dct['platform'], task_dct['asin'], task_dct.get('with_qty', False)))
 
     handle_cls = get_spider_by_platform(task_dct['platform'])
     url = get_url_by_platform(task_dct['platform'], task_dct['asin'])
+    qty_info = {}
     try:
-        soup = await get_page(url, timeout=70)
-        handle = handle_cls(soup)
+        if not task_dct.get('with_qty'):
+            soup = await get_page(url, timeout=60)
+            handle = handle_cls(soup)
+        else:
+            sess = GetPageSession()
+            html = await sess.get_page('get', url, timeout=60, captcha_bypass=True)
+            soup = etree.HTML(html, parser=etree.HTMLParser(encoding='utf-8'))
+            handle = handle_cls(soup)
+            offer_listing_id = handle.get_offer_listing_id()
+            ue_id = handle.get_ue_id()
+            session_id = handle.get_session_id()
+            domain = get_domain_by_platform(task_dct['platform'])
+            if offer_listing_id and ue_id and session_id:
+                ### get ubid-main cookie
+                collect_coupon_url = COLLECT_COUPON.format(domain=domain)
+                data = {"pageReImpType": "aplImpressionPC"}
+                headers = {'Referer': url, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/x-www-form-urlencoded"}
+                cookies = {'csm-hit': 's-{ue_id:s}|{time:d}'.format(ue_id=ue_id, time=int(time.time()*1000))}
+                await sess.get_page('post', collect_coupon_url, data=data, headers=headers, cookies=cookies, timeout=30)
+                ### get qty
+                add_to_cart_url = ADD_TO_CART.format(domain=domain)
+                data = ADD_TO_CART_DATA.format(asin=task_dct['asin'], session_id=session_id, offer_listing_id=offer_listing_id, qty=999)
+                headers = {'Referer': url, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/x-www-form-urlencoded"}
+                cookies = {'csm-hit': '{ue_id:s}+s-{ue_id:s}|{time:d}'.format(ue_id=ue_id, time=int(time.time()*1000))}
+                ret = await sess.get_page('post', add_to_cart_url, data=data, headers=headers, cookies=cookies, timeout=30)
+                qty_info = json.loads(ret.decode('utf-8'))
     except RequestError:
         tp.set_to('input_back')
         return tp
@@ -92,6 +124,7 @@ async def handle_worker(group, task):
 
     try:
         info = handle.get_info()
+        info['qty'] = qty_info.get('cartQuantity')
         # extra info
         info['asin'] = task_dct['asin']
         info['platform'] = task_dct['platform']
