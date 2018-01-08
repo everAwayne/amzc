@@ -14,23 +14,6 @@ b_to_str = lambda x:x.decode('utf-8') if PY3 else x
 str_to_b = lambda x:x.encode('utf-8') if PY3 else x
 
 
-def redis_execute(func):
-    @functools.wraps(func)
-    def redis_execute_wrapper(*args, **kwargs):
-        retry = 3
-        while retry>0:
-            retry -= 1
-            try:
-                return func(*args, **kwargs)
-            except redis.ConnectionError as e:
-                redis_client.connection_pool.disconnect()
-            except redis.TimeoutError as e:
-                redis_client.connection_pool.disconnect()
-        else:
-            raise RuntimeError("Fail to get conf")
-    return redis_execute_wrapper
-
-
 class FlowInput(object):
     _local = threading.local()
     _lock = threading.Lock()
@@ -50,10 +33,26 @@ class FlowInput(object):
 
     @staticmethod
     def load_conf():
+        redis_client = redis.Redis(**REDIS_CONF)
+        def redis_execute(func):
+            @functools.wraps(func)
+            def redis_execute_wrapper(*args, **kwargs):
+                retry = 3
+                while retry>0:
+                    retry -= 1
+                    try:
+                        return func(*args, **kwargs)
+                    except redis.ConnectionError as e:
+                        redis_client.connection_pool.disconnect()
+                    except redis.TimeoutError as e:
+                        redis_client.connection_pool.disconnect()
+                else:
+                    raise RuntimeError("Fail to get conf")
+            return redis_execute_wrapper
+
         if not hasattr(FlowInput, "task_conf_dct") or not hasattr(FlowInput, "rabbitmq_conf_dct"):
             with FlowInput._lock:
                 if not hasattr(FlowInput, "task_conf_dct") or not hasattr(FlowInput, "rabbitmq_conf_dct"):
-                    redis_client = redis.Redis(**REDIS_CONF)
                     task_conf_dct = redis_execute(redis_client.hgetall)("task_conf")
                     FlowInput.task_conf_dct = dict([(b_to_str(k), json.loads(b_to_str(v)))
                                                     for k,v in task_conf_dct.items()])
