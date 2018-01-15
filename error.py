@@ -10,3 +10,8 @@ class StatusError(AMZCrawlerError):
 
 class CaptchaError(AMZCrawlerError):
     pass
+
+class BannedError(AMZCrawlerError):
+    def __init__(self, proxy, *args, **kwargs):
+        self.proxy = proxy
+        super(BannedError, self).__init__(*args, **kwargs)

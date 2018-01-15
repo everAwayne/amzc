@@ -114,6 +114,8 @@ class AMZProductInfo:
         ls_2 = self.soup.xpath("//div[@id='purchase-sims-feature']//div[@data-a-carousel-options]/@data-a-carousel-options")
         ls_3 = self.soup.xpath("//div[@id='session-sims-feature']//div[@data-a-carousel-options]/@data-a-carousel-options")
         ls_4 = self.soup.xpath("//div[@id='recommendations']/ul/li/span/div[1]/a/@href")
+        ls_5 = self.soup.xpath("//div[@id='sp_detail']/@data-a-carousel-options")
+        ls_6 = self.soup.xpath("//div[@id='sp_detail2']/@data-a-carousel-options")
         if ls_2:
             ls_2 = json.loads(ls_2[0])['ajax']['id_list']
         if ls_3:
@@ -124,34 +126,58 @@ class AMZProductInfo:
                 reg_ret = re.search(r'/dp/([^/]+)/', item)
                 ls.append(reg_ret.group(1))
             ls_4 = ls
+        if ls_5:
+            ls_5 = json.loads(ls_5[0])['initialSeenAsins']
+        if ls_6:
+            ls_6 = json.loads(ls_6[0])['initialSeenAsins']
 
         return {'bought_together': ls_1, 'also_bought': ls_2, 'also_viewed': ls_3,
-                'viewed_also_bought': ls_4}
+                'viewed_also_bought': ls_4, 'sponsored_1': ls_5, 'sponsored_2': ls_6,}
 
 
     def get_sku_info(self):
         """Extract all sku asin
         """
-        sku_ls = []
+        sku_dct = {}
         script_text_ls = self.soup.xpath("//script[contains(text(), 'twister-js-init-mason-data') and contains(text(), 'dataToReturn')]/text()")
         if script_text_ls:
             script_text = script_text_ls[0]
             reg_ret = re.search(r"var\s+dataToReturn\s*=\s*{.+?};", script_text, re.S)
             if reg_ret:
                 js_obj = js2py.eval_js(reg_ret.group(0))
-                dct = js_obj['asin_variation_values'].to_dict()
-                sku_ls = list(dct)
-        if not sku_ls:
+                attr_name_dct = js_obj['variationDisplayLabels'].to_dict()
+                asin_attr_dct = js_obj['asin_variation_values'].to_dict()
+                attr_value_dct = js_obj['variation_values'].to_dict()
+                for asin in asin_attr_dct:
+                    dct = {}
+                    for k in asin_attr_dct[asin]:
+                        if k.lower() != 'asin':
+                            name = attr_name_dct[k]
+                            value = attr_value_dct[k][int(asin_attr_dct[asin][k])]
+                            dct[name] = value
+                    if dct:
+                        sku_dct[asin] = dct
+        if not sku_dct:
             script_text_ls = self.soup.xpath("//script[contains(text(), 'twister-js-init-dpx-data') and contains(text(), 'dataToReturn')]/text()")
             if script_text_ls:
                 script_text = script_text_ls[0]
                 reg_ret = re.search(r"var\s+dataToReturn\s*=\s*{.+?};", script_text, re.S)
                 if reg_ret:
                     js_obj = js2py.eval_js(reg_ret.group(0))
-                    dct = js_obj['asinVariationValues'].to_dict()
-                    sku_ls = list(dct)
+                    attr_name_dct = js_obj['variationDisplayLabels'].to_dict()
+                    asin_attr_dct = js_obj['asinVariationValues'].to_dict()
+                    attr_value_dct = js_obj['variationValues'].to_dict()
+                    for asin in asin_attr_dct:
+                        dct = {}
+                        for k in asin_attr_dct[asin]:
+                            if k.lower() != 'asin':
+                                name = attr_name_dct[k]
+                                value = attr_value_dct[k][int(asin_attr_dct[asin][k])]
+                                dct[name] = value
+                        if dct:
+                            sku_dct[asin] = dct
 
-        return sku_ls
+        return sku_dct
 
 
     def get_offer_listing_id(self):

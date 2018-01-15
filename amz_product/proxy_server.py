@@ -2,7 +2,7 @@ import json
 import time
 import pipeflow
 from lxml import etree
-from error import RequestError, CaptchaError
+from error import RequestError, CaptchaError, BannedError
 from util.log import logger
 from util.prrequest import get_page, GetPageSession
 from util.task_protocal import TaskProtocal
@@ -105,6 +105,11 @@ async def handle_worker(group, task):
                 cookies = {'csm-hit': '{ue_id:s}+s-{ue_id:s}|{time:d}'.format(ue_id=ue_id, time=int(time.time()*1000))}
                 ret = await sess.get_page('post', add_to_cart_url, data=data, headers=headers, cookies=cookies, timeout=30)
                 qty_info = json.loads(ret.decode('utf-8'))
+    except BannedError as exc:
+        tp.set_to('input_back')
+        ban_tp = tp.new_task({'proxy': exc.proxy[7:]})
+        ban_tp.set_to('ban')
+        return [ban_tp, tp]
     except RequestError:
         tp.set_to('input_back')
         return tp
@@ -141,7 +146,8 @@ async def handle_worker(group, task):
 
 def run():
     input_end = RabbitmqInputEndpoint('amz_product:input', **RABBITMQ_CONF)
-    output_end = RabbitmqOutputEndpoint(['amz_product:input', 'amz_product:output'], **RABBITMQ_CONF)
+    output_end = RabbitmqOutputEndpoint(['amz_product:input', 'amz_product:output',
+                                         'amz_ip_ban:input'], **RABBITMQ_CONF)
 
     server = pipeflow.Server()
     group = server.add_group('main', MAX_WORKERS)
@@ -149,4 +155,5 @@ def run():
     group.add_input_endpoint('input', input_end)
     group.add_output_endpoint('input_back', output_end, 'amz_product:input')
     group.add_output_endpoint('output', output_end, 'amz_product:output')
+    group.add_output_endpoint('ban', output_end, 'amz_ip_ban:input')
     server.run()
