@@ -27,6 +27,8 @@ class AMZProductInfo:
         img_info = self.get_img_info()
         review_info = self.get_review()
         merchant_info = self.get_merchants_info()
+        description_ls = self.get_description()
+        category_ls = self.get_category()
         product_info = self.get_product_info()
         relative_info = self.get_relative_asin()
         sku_info = self.get_sku_info()
@@ -39,12 +41,14 @@ class AMZProductInfo:
             'price': price_info['price'],
             'discount': price_info['discount'],
             'img': img_info['img'],
-            #'imgs': img_info['imgs'],
+            'imgs': img_info['imgs'],
             'review': review_info['review_score'],
             'review_count': review_info['review_num'],
             'review_statistics': review_info['review_statistics'],
             'merchant': merchant_info['merchant'],
             'merchant_id': merchant_info['merchant_id'],
+            'description': description_ls,
+            'category': category_ls,
             'detail_info': product_info['bsr_info'],
             'product_info': product_info['product_info'],
             'relative_info': relative_info,
@@ -83,7 +87,7 @@ class AMZProductInfo:
         img_dct = {'img': '', 'imgs':[]}
         img_ls = []
         img_info = self.soup.xpath("//*[@id='imageBlock_feature_div']//script[contains(text(),'ImageBlockATF')]/text()")[0]
-        reg_ret = re.search(r"var\s+data\s*=\s*({.+});", img_info, re.S)
+        reg_ret = re.search(r"var\s+data\s*=\s*({.+?});", img_info, re.S)
         if reg_ret:
             ls = re.findall(r'''["']large["']\s*:\s*["'](.+?)["']''', reg_ret.group(1), re.M)
             img_ls.extend(ls)
@@ -107,6 +111,26 @@ class AMZProductInfo:
         return {"merchant": merchant, "merchant_id": merchant_id}
 
 
+    def get_description(self):
+        """Extract description info
+        """
+        description_ls = []
+        text_ls = self.soup.xpath("//*[@id='descriptionAndDetails']//*[@id='productDescription']//text()")
+        for text in text_ls:
+            text = text.strip()
+            if text:
+                description_ls.append(text)
+        return description_ls
+
+
+    def get_category(self):
+        """Extract category info
+        """
+        category_ls = self.soup.xpath("//div[@id='wayfinding-breadcrumbs_feature_div']//li//a/text()")
+        category_ls = [i.strip() for i in category_ls]
+        return category_ls
+
+
     def get_relative_asin(self):
         """Extract asin from 'bought together' and 'also bought'
         """
@@ -116,6 +140,7 @@ class AMZProductInfo:
         ls_4 = self.soup.xpath("//div[@id='recommendations']/ul/li/span/div[1]/a/@href")
         ls_5 = self.soup.xpath("//div[@id='sp_detail']/@data-a-carousel-options")
         ls_6 = self.soup.xpath("//div[@id='sp_detail2']/@data-a-carousel-options")
+        ls_7 = self.soup.xpath("//table[@id='HLCXComparisonTable']//div[contains(@id,'comparison_title')]/a/@href")
         if ls_2:
             ls_2 = json.loads(ls_2[0])['ajax']['id_list']
         if ls_3:
@@ -130,9 +155,18 @@ class AMZProductInfo:
             ls_5 = json.loads(ls_5[0])['initialSeenAsins']
         if ls_6:
             ls_6 = json.loads(ls_6[0])['initialSeenAsins']
+        if ls_7:
+            pattern = re.compile('/dp/([^/]+)')
+            ls = []
+            for url in ls_7:
+                reg_ret = pattern.search(url)
+                if reg_ret:
+                    ls.append(reg_ret.group(1))
+            ls_7 = ls
 
         return {'bought_together': ls_1, 'also_bought': ls_2, 'also_viewed': ls_3,
-                'viewed_also_bought': ls_4, 'sponsored_1': ls_5, 'sponsored_2': ls_6,}
+                'viewed_also_bought': ls_4, 'sponsored_1': ls_5, 'sponsored_2': ls_6,
+                'compare_to_similar': ls_7}
 
 
     def get_sku_info(self):

@@ -12,7 +12,7 @@ from pipeflow import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
 from config import RABBITMQ_CONF
 
 
-MAX_WORKERS = 2
+MAX_WORKERS = 1
 PLATFORM_FILTER_LS = ["amazon_us"]
 
 
@@ -32,12 +32,14 @@ async def handle_worker(group, task):
                 "platform": "amazon_us",
                 "url": "https://www.amazon.de/gp/bestsellers",
                 "date": "2017-08-08"
+                "with_qty": True    #optional
             }
     [output] result data format:
         JSON:
             {
                 "platform": "amazon_us"
                 "asin": "xxxx"
+                "with_qty": True    #optional
                 "extra": {
                     "bsr": {
                         "bs_cate": [item["cate"]],
@@ -102,13 +104,16 @@ async def handle_worker(group, task):
 
         task_ls = []
         for url in url_ls:
-            new_tp = tp.new_task({'platform': task_dct['platform'], 'url': url, 'date': task_dct['date']})
+            new_tp = tp.new_task({'platform': task_dct['platform'], 'url': url,
+                                  'date': task_dct['date'],
+                                  'with_qty': task_dct.get('with_qty', False)})
             new_tp.set_to('inner_output')
             task_ls.append(new_tp)
         task_count += len(url_ls)
         for item in asin_ls:
             new_tp = tp.new_task({'platform': task_dct['platform'],
                                   'asin': item['asin'],
+                                  'with_qty': task_dct.get('with_qty', False),
                                   'extra': {
                                       'bsr': {'bs_cate': [item['cate']], 'date': task_dct['date']}
                                       }
@@ -134,6 +139,7 @@ async def handle_task(group, task):
                 "platform": "amazon_us",
                 "root_url": "https://www.amazon.de/gp/bestsellers",
                 "category_filter": ["name1", ... ,"namex"]
+                "with_qty": True    #optional
             }
     [notify] task data format:
         BYTES:

@@ -46,6 +46,7 @@ async def handle_worker(group, task):
                         "author_id": "author_id",
                         "date": "2017-09-09",
                         "verified_purchase": False,
+                        "imgs": [],
                     }
                 ]
             }

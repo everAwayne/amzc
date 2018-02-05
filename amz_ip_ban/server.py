@@ -71,7 +71,7 @@ def release_proxy(group, task):
 def run():
     ban_input_end = RabbitmqInputEndpoint('amz_ip_ban:input', **RABBITMQ_CONF)
     release_ip_end = TimeInputEndpoint('amz_banned_ip', **IP_REDIS_CONF)
-    ban_ip_end = TimeOutputEndpoint([('amz_banned_ip', 1440)], **IP_REDIS_CONF)
+    ban_ip_end = TimeOutputEndpoint([('amz_banned_ip', 4320)], **IP_REDIS_CONF)
 
     server = pipeflow.Server()
     group = server.add_group('remove', 1)

@@ -80,6 +80,7 @@ class AMZFRReviewInfo(object):
                 'author_id': '',
                 'date': '',
                 'verified_purchase': '',
+                'imgs': [],
             }
             tmp_ls = item.xpath('./@id')
             if tmp_ls:

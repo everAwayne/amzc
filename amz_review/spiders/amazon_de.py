@@ -80,6 +80,7 @@ class AMZDEReviewInfo(object):
                 'author_id': '',
                 'date': '',
                 'verified_purchase': '',
+                'imgs': [],
             }
             tmp_ls = item.xpath('./@id')
             if tmp_ls:
@@ -114,6 +115,9 @@ class AMZDEReviewInfo(object):
 
             tmp_ls = item.xpath(".//span[@data-hook='avp-badge']")
             review_info['verified_purchase'] = True if tmp_ls else False
+
+            tmp_ls = item.xpath(".//img[@data-hook='review-image-tile']/@src")
+            review_info['imgs'] = tmp_ls
 
             review_ls.append(review_info)
         return review_ls

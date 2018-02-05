@@ -52,14 +52,15 @@ class AMZJPReviewInfo(object):
         ls = self.soup.xpath('//div[@id="cm_cr-review_list"]/div[@data-hook="review"]')
         for item in ls:
             review_info = {
-                'review_id': None,
-                'rating': None,
-                'title': None,
-                'content': None,
-                'author': None,
-                'author_id': None,
-                'date': None,
-                'verified_purchase': None,
+                'review_id': '',
+                'rating': '',
+                'title': '',
+                'content': '',
+                'author': '',
+                'author_id': '',
+                'date': '',
+                'verified_purchase': '',
+                'imgs': [],
             }
             tmp_ls = item.xpath('./@id')
             if tmp_ls:
@@ -94,6 +95,9 @@ class AMZJPReviewInfo(object):
 
             tmp_ls = item.xpath(".//span[@data-hook='avp-badge']")
             review_info['verified_purchase'] = True if tmp_ls else False
+
+            tmp_ls = item.xpath(".//img[@data-hook='review-image-tile']/@src")
+            review_info['imgs'] = tmp_ls
 
             review_ls.append(review_info)
         return review_ls

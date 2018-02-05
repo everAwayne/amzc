@@ -5,9 +5,10 @@ import argparse
 from util import daemon
 
 
-CRAWLER_LS = ['flow_core', 'callback', 'statistic',
+CRAWLER_LS = ['flow_core', 'callback', 'statistic', 'ip_ban',
               'bsr', 'proxy_product', 'vps_product', 'bsr_result', 'review', 'qa',
-              'keyword', 'relationship']
+              'keyword', 'relationship',
+              'bsr_qty']
 
 
 if __name__ == '__main__':
@@ -25,6 +26,8 @@ if __name__ == '__main__':
         from amz_bsr_product import server
     elif args.crawler == 'bsr_result':
         from amz_bsr_result import server
+    elif args.crawler == 'bsr_qty':
+        from amz_bsr_qty import server
     elif args.crawler == 'proxy_product':
         from amz_product import proxy_server as server
     elif args.crawler == 'vps_product':
@@ -43,4 +46,6 @@ if __name__ == '__main__':
         from amz_relationship import server
     elif args.crawler == 'statistic':
         from statistic import server
+    elif args.crawler == 'ip_ban':
+        from amz_ip_ban import server
     server.run()

@@ -39,6 +39,8 @@ async def handle_worker(group, task):
                 'discount': 0.83,
                 'merchant_id': 'A3RJPJ9XCKYOM5',
                 'merchant': 'MarketWeb',
+                'description': [],
+                'category': [],
                 "product_info": {
                     "product_dimensions": "2 x 2 x 2 inches ; 0.6 ounces",
                     "shipping_weight": "3.2 ounces ()",
@@ -54,6 +56,9 @@ async def handle_worker(group, task):
                     'also_bought': [],
                     'also_viewed': [],
                     'viewed_also_bought': [],
+                    'sponsored_1': [],
+                    'sponsored_2': [],
+                    'compare_to_similar': [],
                 },
                 'sku_info': [],
                 'fba': 1,
@@ -67,6 +72,7 @@ async def handle_worker(group, task):
                     "5": 80
                 },
                 'img': 'https://images-na.ssl-images-amazon.com/images/I/514RSPIJMKL.jpg',
+                'imgs': [],
                 'qty': 123, #None
             }
     """
