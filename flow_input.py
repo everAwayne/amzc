@@ -6,7 +6,7 @@ import zlib
 import random
 import functools
 import threading
-from config import REDIS_CONF
+from .config import REDIS_CONF
 
 
 PY3 = sys.version_info > (3,)
