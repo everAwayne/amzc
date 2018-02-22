@@ -81,6 +81,7 @@ class AMZITReviewInfo(object):
                 'date': '',
                 'verified_purchase': '',
                 'imgs': [],
+                'helpful_vote': 0,
             }
             tmp_ls = item.xpath('./@id')
             if tmp_ls:
@@ -118,6 +119,14 @@ class AMZITReviewInfo(object):
 
             tmp_ls = item.xpath(".//img[@data-hook='review-image-tile']/@src")
             review_info['imgs'] = tmp_ls
+
+            tmp_ls = item.xpath(".//span[@data-hook='helpful-vote-statement']/text()")
+            if tmp_ls:
+                review_info['helpful_vote'] = 1
+            text = ' '.join(tmp_ls)
+            reg_ret = re.search('(\d[\d,.]*)', text)
+            if reg_ret:
+                review_info['helpful_vote'] = int(reg_ret.group(1).replace(',', '').replace('.', '').strip())
 
             review_ls.append(review_info)
         return review_ls
