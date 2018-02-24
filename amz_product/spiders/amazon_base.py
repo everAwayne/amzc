@@ -76,6 +76,8 @@ class AMZProductInfo:
         """Extract brand info
         """
         t_text_ls = self.soup.xpath("//*[@id='brand']//text()")
+        if not t_text_ls:
+            t_text_ls = self.soup.xpath("//*[@id='bylineInfo']/text()")
         text_ls = t_text_ls
         brand = ' '.join([i.strip() for i in text_ls if i.strip()])
         return {'brand': brand}
@@ -116,6 +118,8 @@ class AMZProductInfo:
         """
         description_ls = []
         text_ls = self.soup.xpath("//*[@id='descriptionAndDetails']//*[@id='productDescription']//text()")
+        if not text_ls:
+            text_ls = self.soup.xpath("//*[@id='aplus']//p[@class='a-spacing-base']/text()")
         for text in text_ls:
             text = text.strip()
             if text:

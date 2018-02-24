@@ -98,7 +98,8 @@ class FlowInput(object):
                         body=zlib.compress(str_to_b(json.dumps(task_dct))))
             except (pika.exceptions.ChannelClosed, pika.exceptions.ConnectionClosed):
                 print("[flow input]=====connection closed=====")
-                self._local.connection.close()
+                if not self._local.connection.is_closed:
+                    self._local.connection.close()
                 try:
                     self._local.connection = pika.BlockingConnection(self._local.parameters)
                     self._local.channel = connection.channel()
