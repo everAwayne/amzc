@@ -82,6 +82,7 @@ class AMZITReviewInfo(object):
                 'verified_purchase': '',
                 'imgs': [],
                 'helpful_vote': 0,
+                'asin': '',
             }
             tmp_ls = item.xpath('./@id')
             if tmp_ls:
@@ -124,9 +125,15 @@ class AMZITReviewInfo(object):
             if tmp_ls:
                 review_info['helpful_vote'] = 1
             text = ' '.join(tmp_ls)
-            reg_ret = re.search('(\d[\d,.]*)', text)
+            reg_ret = re.search(r'(\d[\d,.]*)', text)
             if reg_ret:
                 review_info['helpful_vote'] = int(reg_ret.group(1).replace(',', '').replace('.', '').strip())
+
+            tmp_ls = item.xpath(".//a[@data-hook='format-strip']/@href")
+            if tmp_ls:
+                reg_ret = re.search(r'product-reviews/(\w{10})/', tmp_ls[0])
+                if reg_ret:
+                    review_info['asin'] = reg_ret.group(1)
 
             review_ls.append(review_info)
         return review_ls

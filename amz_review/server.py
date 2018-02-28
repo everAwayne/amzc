@@ -118,6 +118,9 @@ async def handle_worker(group, task):
     else:
         task_ls.append(notify_task)
     if review_ls:
+        for item in review_ls:
+            if not item['asin']:
+                item['asin'] = task_dct['asin']
         info = {
             'platform': task_dct['platform'], 'asin': task_dct['asin'],
             'page': page_info['cur_page'],

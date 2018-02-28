@@ -135,7 +135,7 @@ async def handle_worker(group, task):
 
     try:
         info = handle.get_info()
-        info['qty'] = qty_info.get('cartQuantity')
+        info['qty'] = int(qty_info['cartQuantity']) if qty_info.get('cartQuantity') else None
         # extra info
         info['asin'] = task_dct['asin']
         info['platform'] = task_dct['platform']
