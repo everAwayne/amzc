@@ -4,7 +4,7 @@ import time
 import asyncio
 import pipeflow
 from lxml import etree
-from error import RequestError, CaptchaError
+from error import RequestError, CaptchaError, BannedError
 from util.log import logger
 from util.prrequest import GetPageSession
 from .spiders.dispatch import get_spider_by_platform
@@ -66,6 +66,11 @@ async def handle_worker(group, task):
             html = await sess.get_page('get', url, timeout=60, captcha_bypass=True)
             soup = etree.HTML(html, parser=etree.HTMLParser(encoding='utf-8'))
             handle = handle_cls(soup)
+        except BannedError as exc:
+            tp.set_to('input_back')
+            ban_tp = tp.new_task({'proxy': exc.proxy[7:]})
+            ban_tp.set_to('ban')
+            return [ban_tp, tp]
         except RequestError:
             tp.set_to('inner_output')
             task_count += 1
@@ -184,7 +189,8 @@ async def handle_task(group, task):
 
 def run():
     bsr_end = RabbitmqInputEndpoint('amz_bsr:input', **RABBITMQ_CONF)
-    output_end = RabbitmqOutputEndpoint(['amz_bsr:input', 'amz_bsr:output'], **RABBITMQ_CONF)
+    output_end = RabbitmqOutputEndpoint(['amz_bsr:input', 'amz_bsr:output',
+                                         'amz_ip_ban:input'], **RABBITMQ_CONF)
     queue = asyncio.Queue()
     notify_input_end = pipeflow.QueueInputEndpoint(queue)
     notify_output_end = pipeflow.QueueOutputEndpoint(queue)
@@ -207,4 +213,5 @@ def run():
     worker_group.add_output_endpoint('output', output_end, 'amz_bsr:output', buffer_size=MAX_WORKERS*20)
     worker_group.add_output_endpoint('inner_output', inner_output_end)
     worker_group.add_output_endpoint('notify', notify_output_end)
+    worker_group.add_output_endpoint('ban', output_end, 'amz_ip_ban:input')
     server.run()

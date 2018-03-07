@@ -117,6 +117,12 @@ class AMZProductInfo:
         """Extract description info
         """
         description_ls = []
+        text_ls = self.soup.xpath("//*[@id='feature-bullets']/ul/li/span[@class='a-list-item']/text()")
+        for text in text_ls:
+            text = text.strip()
+            if text:
+                description_ls.append(text)
+
         text_ls = self.soup.xpath("//*[@id='descriptionAndDetails']//*[@id='productDescription']//text()")
         if not text_ls:
             text_ls = self.soup.xpath("//*[@id='aplus']//p[@class='a-spacing-base']/text()")
