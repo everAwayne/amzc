@@ -3,10 +3,11 @@ import json
 import time
 import asyncio
 import pipeflow
+from lxml import etree
 from urllib import parse
 from error import RequestError, CaptchaError
 from util.log import logger
-from util.prrequest import get_page
+from util.prrequest import GetPageSession
 from .spiders.dispatch import get_spider_by_platform, get_url_by_platform, formalize_url
 from util.task_protocal import TaskProtocal
 from pipeflow import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
@@ -61,7 +62,9 @@ async def handle_worker(group, task):
     if not url:
         url = get_url_by_platform(task_dct['platform'], task_dct['asin'])
     try:
-        soup = await get_page(url, timeout=60)
+        sess = GetPageSession()
+        html = await sess.get_page('get', url, timeout=60, captcha_bypass=True)
+        soup = etree.HTML(html, parser=etree.HTMLParser(encoding='utf-8'))
         handle = handle_cls(soup)
     except RequestError:
         tp.set_to('inner_output')

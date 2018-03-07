@@ -4,7 +4,7 @@ import pipeflow
 from lxml import etree
 from error import RequestError, CaptchaError, BannedError
 from util.log import logger
-from util.prrequest import get_page, GetPageSession
+from util.prrequest import GetPageSession
 from util.task_protocal import TaskProtocal
 from .spiders.dispatch import get_spider_by_platform, get_url_by_platform, get_domain_by_platform
 from pipeflow import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
@@ -86,7 +86,9 @@ async def handle_worker(group, task):
     qty_info = {}
     try:
         if not task_dct.get('with_qty'):
-            soup = await get_page(url, timeout=60)
+            sess = GetPageSession()
+            html = await sess.get_page('get', url, timeout=60, captcha_bypass=True)
+            soup = etree.HTML(html, parser=etree.HTMLParser(encoding='utf-8'))
             handle = handle_cls(soup)
         else:
             sess = GetPageSession()

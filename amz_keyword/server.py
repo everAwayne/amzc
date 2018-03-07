@@ -1,8 +1,9 @@
 import json
 import asyncio
 import pipeflow
+from lxml import etree
 from util.log import logger
-from util.prrequest import get_page
+from util.prrequest import GetPageSession
 from util.task_protocal import TaskProtocal
 from error import RequestError, CaptchaError
 from pipeflow import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
@@ -52,7 +53,9 @@ async def handle_worker(group, task):
     handle_cls = get_spider_by_platform(task_dct['platform'])
 
     try:
-        soup = await get_page(task_dct['url'], timeout=60)
+        sess = GetPageSession()
+        html = await sess.get_page('get', task_dct['url'], timeout=60, captcha_bypass=True)
+        soup = etree.HTML(html, parser=etree.HTMLParser(encoding='utf-8'))
         handle = handle_cls(soup)
     except RequestError:
         tp.set_to('inner_output')
