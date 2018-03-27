@@ -102,7 +102,7 @@ class FlowInput(object):
                     self._local.connection.close()
                 try:
                     self._local.connection = pika.BlockingConnection(self._local.parameters)
-                    self._local.channel = connection.channel()
+                    self._local.channel = self._local.connection.channel()
                     self._local.channel.confirm_delivery()
                 except:
                     print("[flow input]=====reconnect error=====")

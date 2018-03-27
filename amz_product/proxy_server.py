@@ -11,7 +11,7 @@ from pipeflow import RabbitmqInputEndpoint, RabbitmqOutputEndpoint
 from config import RABBITMQ_CONF
 
 
-MAX_WORKERS = 40
+MAX_WORKERS = 25
 COLLECT_COUPON = "https://{domain:s}/gp/collect-coupon/handler/applicable_promotion_list_hover_count.html?ref_=apl_desktop_imp"
 ADD_TO_CART = "https://{domain:s}/gp/add-to-cart/json/ref=dp_start-bbf_1_glance"
 ADD_TO_CART_DATA = "clientName=SmartShelf&ASIN={asin:s}&verificationSessionID={session_id:s}&offerListingID={offer_listing_id:s}&quantity={qty:d}"
@@ -84,52 +84,53 @@ async def handle_worker(group, task):
     handle_cls = get_spider_by_platform(task_dct['platform'])
     url = get_url_by_platform(task_dct['platform'], task_dct['asin'])
     qty_info = {}
-    try:
-        if not task_dct.get('with_qty'):
-            sess = GetPageSession()
-            html = await sess.get_page('get', url, timeout=60, captcha_bypass=True)
-            soup = etree.HTML(html, parser=etree.HTMLParser(encoding='utf-8'))
-            handle = handle_cls(soup)
-        else:
-            sess = GetPageSession()
-            html = await sess.get_page('get', url, timeout=60, captcha_bypass=True)
-            soup = etree.HTML(html, parser=etree.HTMLParser(encoding='utf-8'))
-            handle = handle_cls(soup)
-            offer_listing_id = handle.get_offer_listing_id()
-            ue_id = handle.get_ue_id()
-            session_id = handle.get_session_id()
-            domain = get_domain_by_platform(task_dct['platform'])
-            if offer_listing_id and ue_id and session_id:
-                ### get ubid-main cookie
-                collect_coupon_url = COLLECT_COUPON.format(domain=domain)
-                data = {"pageReImpType": "aplImpressionPC"}
-                headers = {'Referer': url, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/x-www-form-urlencoded"}
-                cookies = {'csm-hit': 's-{ue_id:s}|{time:d}'.format(ue_id=ue_id, time=int(time.time()*1000))}
-                await sess.get_page('post', collect_coupon_url, data=data, headers=headers, cookies=cookies, timeout=30)
-                ### get qty
-                add_to_cart_url = ADD_TO_CART.format(domain=domain)
-                data = ADD_TO_CART_DATA.format(asin=task_dct['asin'], session_id=session_id, offer_listing_id=offer_listing_id, qty=999)
-                headers = {'Referer': url, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/x-www-form-urlencoded"}
-                cookies = {'csm-hit': '{ue_id:s}+s-{ue_id:s}|{time:d}'.format(ue_id=ue_id, time=int(time.time()*1000))}
-                ret = await sess.get_page('post', add_to_cart_url, data=data, headers=headers, cookies=cookies, timeout=30)
-                qty_info = json.loads(ret.decode('utf-8'))
-    except BannedError as exc:
-        tp.set_to('input_back')
-        ban_tp = tp.new_task({'proxy': exc.proxy[7:]})
-        ban_tp.set_to('ban')
-        return [ban_tp, tp]
-    except RequestError:
-        tp.set_to('input_back')
-        return tp
-    except CaptchaError:
-        tp.set_to('input_back')
-        return tp
-    except Exception as exc:
-        exc_info = (type(exc), exc, exc.__traceback__)
-        taks_info = ' '.join([task_dct['platform'], task_dct['asin']])
-        logger.error('Get page handle error\n'+taks_info, exc_info=exc_info)
-        exc.__traceback__ = None
-        return
+    with GetPageSession() as sess:
+        try:
+            if not task_dct.get('with_qty'):
+                #sess = GetPageSession()
+                html = await sess.get_page('get', url, timeout=60, captcha_bypass=True)
+                soup = etree.HTML(html, parser=etree.HTMLParser(encoding='utf-8'))
+                handle = handle_cls(soup)
+            else:
+                #sess = GetPageSession()
+                html = await sess.get_page('get', url, timeout=60, captcha_bypass=True)
+                soup = etree.HTML(html, parser=etree.HTMLParser(encoding='utf-8'))
+                handle = handle_cls(soup)
+                offer_listing_id = handle.get_offer_listing_id()
+                ue_id = handle.get_ue_id()
+                session_id = handle.get_session_id()
+                domain = get_domain_by_platform(task_dct['platform'])
+                if offer_listing_id and ue_id and session_id:
+                    ### get ubid-main cookie
+                    collect_coupon_url = COLLECT_COUPON.format(domain=domain)
+                    data = {"pageReImpType": "aplImpressionPC"}
+                    headers = {'Referer': url, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/x-www-form-urlencoded"}
+                    cookies = {'csm-hit': 's-{ue_id:s}|{time:d}'.format(ue_id=ue_id, time=int(time.time()*1000))}
+                    await sess.get_page('post', collect_coupon_url, data=data, headers=headers, cookies=cookies, timeout=30)
+                    ### get qty
+                    add_to_cart_url = ADD_TO_CART.format(domain=domain)
+                    data = ADD_TO_CART_DATA.format(asin=task_dct['asin'], session_id=session_id, offer_listing_id=offer_listing_id, qty=999)
+                    headers = {'Referer': url, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/x-www-form-urlencoded"}
+                    cookies = {'csm-hit': '{ue_id:s}+s-{ue_id:s}|{time:d}'.format(ue_id=ue_id, time=int(time.time()*1000))}
+                    ret = await sess.get_page('post', add_to_cart_url, data=data, headers=headers, cookies=cookies, timeout=30)
+                    qty_info = json.loads(ret.decode('utf-8'))
+        except BannedError as exc:
+            tp.set_to(from_end)
+            ban_tp = tp.new_task({'proxy': exc.proxy[7:]})
+            ban_tp.set_to('ban')
+            return [ban_tp, tp]
+        except RequestError:
+            tp.set_to(from_end)
+            return tp
+        except CaptchaError:
+            tp.set_to(from_end)
+            return tp
+        except Exception as exc:
+            exc_info = (type(exc), exc, exc.__traceback__)
+            taks_info = ' '.join([task_dct['platform'], task_dct['asin']])
+            logger.error('Get page handle error\n'+taks_info, exc_info=exc_info)
+            exc.__traceback__ = None
+            return
 
     is_product_page = handle.is_product_page()
     if not is_product_page:
@@ -154,14 +155,17 @@ async def handle_worker(group, task):
 
 def run():
     input_end = RabbitmqInputEndpoint('amz_product:input', **RABBITMQ_CONF)
-    output_end = RabbitmqOutputEndpoint(['amz_product:input', 'amz_product:output',
+    input5_end = RabbitmqInputEndpoint('amz_product:5:input', **RABBITMQ_CONF)
+    output_end = RabbitmqOutputEndpoint(['amz_product:input', 'amz_product:5:input', 'amz_product:output',
                                          'amz_ip_ban:input'], **RABBITMQ_CONF)
 
     server = pipeflow.Server()
     group = server.add_group('main', MAX_WORKERS)
     group.set_handle(handle_worker)
     group.add_input_endpoint('input', input_end)
+    group.add_input_endpoint('input5_end', input5_end)
     group.add_output_endpoint('input_back', output_end, 'amz_product:input')
+    group.add_output_endpoint('input_5_back', output_end, 'amz_product:5:input')
     group.add_output_endpoint('output', output_end, 'amz_product:output')
     group.add_output_endpoint('ban', output_end, 'amz_ip_ban:input')
     server.run()

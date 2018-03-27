@@ -105,9 +105,10 @@ PC_UA_LS = [
 
 def get_header():
     return {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Encoding': 'gzip, deflate, sdch',
-        'Accept-Language': 'zh-CN,zh;q=0.8',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8,ja;q=0.7',
         'User-Agent': PC_UA_LS[random.randint(0, len(PC_UA_LS)-1)],
+        #'Upgrade-Insecure-Requests': 1,
         'Connection': 'keep-alive',
     }

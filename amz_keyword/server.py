@@ -52,40 +52,41 @@ async def handle_worker(group, task):
         return notify_task
     handle_cls = get_spider_by_platform(task_dct['platform'])
 
-    try:
-        sess = GetPageSession()
-        html = await sess.get_page('get', task_dct['url'], timeout=60, captcha_bypass=True)
-        soup = etree.HTML(html, parser=etree.HTMLParser(encoding='utf-8'))
-        handle = handle_cls(soup)
-    except BannedError as exc:
-        tp.set_to('input_back')
-        ban_tp = tp.new_task({'proxy': exc.proxy[7:]})
-        ban_tp.set_to('ban')
-        return [ban_tp, tp]
-    except RequestError:
-        tp.set_to('inner_output')
-        return tp
-    except CaptchaError:
-        tp.set_to('inner_output')
-        return tp
-    except Exception as exc:
-        exc_info = (type(exc), exc, exc.__traceback__)
-        taks_info = ' '.join([task_dct['platform'], task_dct['url']])
-        logger.error('Get page handle error\n'+taks_info, exc_info=exc_info)
-        exc.__traceback__ = None
+    with GetPageSession() as sess:
+        try:
+            #sess = GetPageSession()
+            html = await sess.get_page('get', task_dct['url'], timeout=60, captcha_bypass=True)
+            soup = etree.HTML(html, parser=etree.HTMLParser(encoding='utf-8'))
+            handle = handle_cls(soup)
+        except BannedError as exc:
+            tp.set_to('input_back')
+            ban_tp = tp.new_task({'proxy': exc.proxy[7:]})
+            ban_tp.set_to('ban')
+            return [ban_tp, tp]
+        except RequestError:
+            tp.set_to('inner_output')
+            return tp
+        except CaptchaError:
+            tp.set_to('inner_output')
+            return tp
+        except Exception as exc:
+            exc_info = (type(exc), exc, exc.__traceback__)
+            taks_info = ' '.join([task_dct['platform'], task_dct['url']])
+            logger.error('Get page handle error\n'+taks_info, exc_info=exc_info)
+            exc.__traceback__ = None
 
-        tps = [notify_task]
-        new_tp = tp.new_task({
-            'platform': task_dct['platform'],
-            'keyword': task_dct['keyword'],
-            'page': task_dct['page'],
-            'end': True,
-            'status': 1,
-            'message': 'Get Page handle error'
-        })
-        new_tp.set_to('output')
-        tps.append(new_tp)
-        return tps
+            tps = [notify_task]
+            new_tp = tp.new_task({
+                'platform': task_dct['platform'],
+                'keyword': task_dct['keyword'],
+                'page': task_dct['page'],
+                'end': True,
+                'status': 1,
+                'message': 'Get Page handle error'
+            })
+            new_tp.set_to('output')
+            tps.append(new_tp)
+            return tps
 
     is_search_page = handle.is_search_page()
     if not is_search_page:

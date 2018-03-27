@@ -29,6 +29,7 @@ class AMZProductInfo:
         merchant_info = self.get_merchants_info()
         description_ls = self.get_description()
         category_ls = self.get_category()
+        is_addon_item = self.get_addon()
         product_info = self.get_product_info()
         relative_info = self.get_relative_asin()
         sku_info = self.get_sku_info()
@@ -49,6 +50,7 @@ class AMZProductInfo:
             'merchant_id': merchant_info['merchant_id'],
             'description': description_ls,
             'category': category_ls,
+            'is_addon_item': is_addon_item,
             'detail_info': product_info['bsr_info'],
             'product_info': product_info['product_info'],
             'relative_info': relative_info,
@@ -117,7 +119,7 @@ class AMZProductInfo:
         """Extract description info
         """
         description_ls = []
-        text_ls = self.soup.xpath("//*[@id='feature-bullets']/ul/li/span[@class='a-list-item']/text()")
+        text_ls = self.soup.xpath("//*[@id='feature-bullets']//ul/li/span[@class='a-list-item']/text()")
         for text in text_ls:
             text = text.strip()
             if text:
@@ -139,6 +141,15 @@ class AMZProductInfo:
         category_ls = self.soup.xpath("//div[@id='wayfinding-breadcrumbs_feature_div']//li//a/text()")
         category_ls = [i.strip() for i in category_ls]
         return category_ls
+
+
+    def get_addon(self):
+        """Extract addon item info
+        """
+        addon_ls = self.soup.xpath("//div[@id='addOnItem_feature_div']//*[contains(@class, 'a-icon-addon')]")
+        if addon_ls:
+            return True
+        return False
 
 
     def get_relative_asin(self):

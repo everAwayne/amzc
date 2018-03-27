@@ -61,30 +61,31 @@ async def handle_worker(group, task):
         handle_cls = get_spider_by_platform(task_dct['platform'])
         url = task_dct['url']
         logger.info("%s" % (url,))
-        try:
-            sess = GetPageSession()
-            html = await sess.get_page('get', url, timeout=60, captcha_bypass=True)
-            soup = etree.HTML(html, parser=etree.HTMLParser(encoding='utf-8'))
-            handle = handle_cls(soup)
-        except BannedError as exc:
-            tp.set_to('input_back')
-            ban_tp = tp.new_task({'proxy': exc.proxy[7:]})
-            ban_tp.set_to('ban')
-            return [ban_tp, tp]
-        except RequestError:
-            tp.set_to('inner_output')
-            task_count += 1
-            return tp
-        except CaptchaError:
-            tp.set_to('inner_output')
-            task_count += 1
-            return tp
-        except Exception as exc:
-            exc_info = (type(exc), exc, exc.__traceback__)
-            taks_info = ' '.join([task_dct['platform'], url])
-            logger.error('Get page handle error\n'+taks_info, exc_info=exc_info)
-            exc.__traceback__ = None
-            return
+        with GetPageSession() as sess:
+            try:
+                #sess = GetPageSession()
+                html = await sess.get_page('get', url, timeout=60, captcha_bypass=True)
+                soup = etree.HTML(html, parser=etree.HTMLParser(encoding='utf-8'))
+                handle = handle_cls(soup)
+            except BannedError as exc:
+                tp.set_to('input_back')
+                ban_tp = tp.new_task({'proxy': exc.proxy[7:]})
+                ban_tp.set_to('ban')
+                return [ban_tp, tp]
+            except RequestError:
+                tp.set_to('inner_output')
+                task_count += 1
+                return tp
+            except CaptchaError:
+                tp.set_to('inner_output')
+                task_count += 1
+                return tp
+            except Exception as exc:
+                exc_info = (type(exc), exc, exc.__traceback__)
+                taks_info = ' '.join([task_dct['platform'], url])
+                logger.error('Get page handle error\n'+taks_info, exc_info=exc_info)
+                exc.__traceback__ = None
+                return
 
         is_bsr_page = handle.is_bsr_page()
         # abandon result
