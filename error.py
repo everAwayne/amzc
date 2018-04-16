@@ -6,7 +6,9 @@ class RequestError(AMZCrawlerError):
     pass
 
 class StatusError(AMZCrawlerError):
-    pass
+    def __init__(self, code, *args, **kwargs):
+        self.code = code
+        super(StatusError, self).__init__(*args, **kwargs)
 
 class CaptchaError(AMZCrawlerError):
     pass
